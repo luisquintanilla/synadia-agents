@@ -6,6 +6,7 @@ on:
     paths:
       - "client-sdk/dotnet/**"
       - "agent-sdk/dotnet/**"
+      - "integrations/agent-framework/**"
       - "client-sdk/typescript/**"
       - "agent-sdk/typescript/**"
       - "test-fixtures/**"
@@ -14,6 +15,7 @@ on:
     paths:
       - "client-sdk/dotnet/**"
       - "agent-sdk/dotnet/**"
+      - "integrations/agent-framework/**"
       - "client-sdk/typescript/**"
       - "agent-sdk/typescript/**"
       - "test-fixtures/**"
@@ -63,6 +65,9 @@ jobs:
         run: dotnet test -c Release
       - name: Host SDK — build + test (incl. e2e and interop)
         working-directory: agent-sdk/dotnet
+        run: dotnet test -c Release
+      - name: Agent Framework adapter — build + test (incl. samples)
+        working-directory: integrations/agent-framework
         run: dotnet test -c Release
       - name: Build examples (file-based apps)
         run: |

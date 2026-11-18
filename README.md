@@ -54,6 +54,8 @@ promotion. Tracing is not part of this release: the SDKs carry generic extension
 request interceptors, extra envelope fields, heartbeat extras), and extensions such as tracing build
 on them in separate packages.
 
+**Microsoft Agent Framework (.NET):** [`Synadia.AI.Agents.AgentFramework`](integrations/agent-framework/) (unpublished) wraps any NATS agent as a MAF `AIAgent` (`agent.AsAIAgent()`) and serves any MAF `AIAgent` on NATS (`agentService.ServeAIAgent(aiAgent)`).
+
 ## Examples
 
 End-to-end apps built on the SDKs — browser clients, controllers that spawn ephemeral agents, and agents built from scratch. Full write-ups in [`examples/README.md`](examples/README.md).
@@ -66,6 +68,8 @@ End-to-end apps built on the SDKs — browser clients, controllers that spawn ep
 | [`dspy/`](examples/dspy/) | agent | From-scratch DSPy-style **ReAct** agent on `AgentService` with four sandboxed filesystem tools. Registers as token `dspy`. |
 | [`dspy-research-agent/`](examples/dspy-research-agent/) | agent | From-scratch DSPy-style **deep-research** agent on ax-llm's RLM — a sandboxed JS REPL with recursive `llmQuery()` sub-calls and pluggable web search (Tavily/Exa + neural `findSimilar`). Registers as token `research`. |
 | [`open-agent-vercel/`](examples/open-agent-vercel/) | agent | Runs the [`agents/open-agent/`](agents/open-agent/) bridge against `@vercel/sandbox` instead of its built-in LocalSandbox — same `runBridge`, same wire behaviour, only the sandbox factory changes. |
+| [`MafNatsDemo/`](integrations/agent-framework/samples/MafNatsDemo/) | both | .NET **Microsoft Agent Framework** agent on Ollama (`qwen3.5:4b`) that calls NATS agents as tools, pauses and resumes on remote questions, and serves a MAF agent whose tool approvals travel over NATS as queries. |
+| [`CopilotNatsAgent/`](integrations/agent-framework/samples/CopilotNatsAgent/) | agent | .NET: **GitHub Copilot** served as agent token `copilot` through Microsoft Agent Framework; Copilot's shell/write/read permission requests become §7 queries to the caller (deny by default). |
 
 ## Wire protocol at a glance
 
@@ -183,6 +187,8 @@ synadia-agents/
 │   ├── open-agent/              ← inbound bridge for vercel-labs/open-agents
 │   ├── opencode/                ← OpenCode plugin channel
 │   └── codex/                   ← Codex app-server-backed channel
+├── integrations/
+│   └── agent-framework/         ← Synadia.AI.Agents.AgentFramework: Microsoft Agent Framework adapter (not published)
 └── examples/              ← apps built with the SDKs (callers and agents)
     ├── agent-web-ui/             ← Vue 3 + Bun browser client
     ├── claude-code-headless/     ← spawn/stop many Claude Code sessions

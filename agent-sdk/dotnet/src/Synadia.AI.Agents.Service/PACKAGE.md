@@ -70,6 +70,9 @@ The SDK sends the end-of-stream terminator. A `RequestRejectedException` becomes
 Session ids are not access control: anyone who knows an id can continue that conversation. To bind a conversation to a
 verified caller, combine the id with the sender identity in `ConversationKey`.
 
+For conversations that survive a restart, serve a Microsoft Agent Framework agent with
+[Synadia.AI.Agents.AgentFramework](https://www.nuget.org/packages/Synadia.AI.Agents.AgentFramework).
+
 ## `ServeChatClient` options
 
 | Option | Default | Effect |

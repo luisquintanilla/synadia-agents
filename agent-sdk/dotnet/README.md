@@ -79,6 +79,7 @@ a verified caller, combine the id with the sender identity in `ConversationKey`.
 | --- | --- | --- |
 | `ServeChatClient` over a stateful client | the service | history yes; the key→ID map is in-memory |
 | `ServeChatClient` over a stateless client | the SDK, in-memory, capped at `MaxHistoryMessages` | no |
+| `ServeAIAgent` | MAF `AgentSession` | yes, with `SessionStore` |
 | `OnPrompt` | you | your choice |
 
 A client is stateful when its responses carry a `ConversationId` (for example, the OpenAI Responses API). The host then
@@ -86,6 +87,9 @@ stores only the newest ID per conversation and sends just the new message with `
 ID comes back, it keeps the messages itself. `KeepHistory = false` makes every prompt stateless. Set it for agents
 whose prompts carry large attachments (documents, images); otherwise every stored attachment is re-sent to the model
 on each later prompt.
+
+For durable conversations, serve `new ChatClientAgent(chatClient, …)` with `ServeAIAgent` and a `SessionStore`
+(package `Synadia.AI.Agents.AgentFramework`).
 
 ## Sender identity (§13)
 

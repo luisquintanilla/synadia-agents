@@ -95,4 +95,6 @@ The SDK checks the agent's advertised limits first. It throws `AttachmentsNotSup
 - [Protocol specification](https://github.com/synadia-ai/synadia-agent-sdk-docs)
 - [SDK guide and protocol mapping](https://github.com/synadia-ai/synadia-agents/tree/main/client-sdk/dotnet)
 - [Examples](https://github.com/synadia-ai/synadia-agents/tree/main/client-sdk/dotnet/examples)
-- Host agents with [Synadia.AI.Agents.Service](https://www.nuget.org/packages/Synadia.AI.Agents.Service).
+- Host agents with [Synadia.AI.Agents.Service](https://www.nuget.org/packages/Synadia.AI.Agents.Service); use agents
+  from Microsoft Agent Framework with
+  [Synadia.AI.Agents.AgentFramework](https://www.nuget.org/packages/Synadia.AI.Agents.AgentFramework).

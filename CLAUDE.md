@@ -86,6 +86,9 @@ SDKs are missing).
 | `examples/pi-headless/` | `@synadia-ai/nats-pi-headless` | npm (public) | depends on `@synadia-ai/agents@^0.5.x` |
 | `examples/agent-web-ui/` | `@synadia-ai/nats-ai-testui` | github only | local-clone test client; `private: true` so it never publishes |
 | `examples/dspy/` | `@synadia-ai/nats-dspy-agent` | private | uses `file:` link to local SDK |
+| `integrations/agent-framework/` | `Synadia.AI.Agents.AgentFramework` | NuGet (unpublished) | Microsoft Agent Framework 1.28.0 adapter (`NatsAIAgent`, `ServeAIAgent`); thin over the .NET SDK |
+| `integrations/agent-framework/samples/MafNatsDemo/` | — | not packable | MAF on Ollama ⇄ NATS agents demo; project-references the adapter |
+| `integrations/agent-framework/samples/CopilotNatsAgent/` | — | not packable | GitHub Copilot served as agent `copilot` via MAF (`Microsoft.Agents.AI.GitHub.Copilot` 1.28.0); permissions become caller queries. |
 
 **No root `package.json`, no workspace manager.** Each subtree manages
 its own deps and tooling. Examples that ship to npm pin the SDK by
@@ -196,8 +199,9 @@ subtree affects another. Before finishing a change, walk the list:
   - Update the matching `CHANGELOG.md`, and `README.md` /
     `docs/protocol-mapping.md` if public behavior changed (the mapping
     doc lives in `client-sdk/dotnet/docs/` and covers both packages).
-  - Run `dotnet test` in both `client-sdk/dotnet` and
-    `agent-sdk/dotnet`; the host suite includes the TS↔.NET interop
+  - Run `dotnet test` in `client-sdk/dotnet`, `agent-sdk/dotnet` and
+    `integrations/agent-framework` (the Agent Framework adapter builds
+    on both); the host suite includes the TS↔.NET interop
     tests, which need `bun` and the built TS SDKs to actually run.
   - Wire changes follow the bullet below: the TS and Python SDKs must
     match.
@@ -316,10 +320,12 @@ token that doesn't surface the permissions sub-object at all.)
     `synadia-ai-agent-service` to PyPI on `python-agent-service-v*`
     tags.
   - `dotnet-sdk.yml` — builds and tests the .NET caller and host SDKs
+    and the Agent Framework adapter
     (net8.0 + net10.0) against a real `nats-server`, runs the TS↔.NET
     interop tests (it builds both TS SDKs first), and builds every
     file-based example. Triggers on `client-sdk/dotnet/**`,
-    `agent-sdk/dotnet/**`, both TS SDKs and `test-fixtures/**`. It
+    `agent-sdk/dotnet/**`, `integrations/agent-framework/**`, both TS
+    SDKs and `test-fixtures/**`. It
     does not publish anything.
 - **No automated TS publish workflow.** TS releases are manual (see
   release ladder). The TypeScript agent CI workflow validates npm package
