@@ -37,7 +37,8 @@ public sealed class PromptStream
 
     /// <summary>
     /// Map one MEAI streaming update onto the wire: text and <see cref="DataContent"/> become a <c>response</c>
-    /// chunk; a <see cref="FunctionCallContent"/> becomes a <c>status</c> (<c>calling {name}</c>);
+    /// chunk; <see cref="AgentStatusContent"/>, or an <c>AdditionalProperties["synadia.status"]</c> string on the update,
+    /// becomes a <c>status</c>; a <see cref="FunctionCallContent"/> becomes a <c>status</c> (<c>calling {name}</c>);
     /// <see cref="TextReasoningContent"/> becomes a <c>status</c> only when <paramref name="includeReasoning"/>;
     /// an <see cref="ErrorContent"/> throws <see cref="RequestRejectedException"/> (500). Other content is dropped.
     /// </summary>
@@ -46,6 +47,7 @@ public sealed class PromptStream
         ArgumentNullException.ThrowIfNull(update);
         StringBuilder? text = null;
         List<DataContent>? data = null;
+        var sawStatusContent = false;
         foreach (var content in update.Contents)
         {
             switch (content)
@@ -55,6 +57,11 @@ public sealed class PromptStream
                     break;
                 case DataContent d:
                     (data ??= []).Add(d);
+                    break;
+                case AgentStatusContent s when !s.IsAck && s.Status.Length > 0:
+                    sawStatusContent = true;
+                    await FlushAsync().ConfigureAwait(false);
+                    await WriteStatusAsync(s.Status, cancellationToken).ConfigureAwait(false);
                     break;
                 case FunctionCallContent call:
                     await FlushAsync().ConfigureAwait(false);
@@ -70,6 +77,22 @@ public sealed class PromptStream
             }
         }
         await FlushAsync().ConfigureAwait(false);
+
+        // Content-less (or status-only) convention: AdditionalProperties["synadia.status"] = "...".
+        if (!sawStatusContent && update.AdditionalProperties is { } props
+            && props.TryGetValue(AgentStatusContent.AdditionalPropertyKey, out var raw)
+            && StatusText(raw) is { Length: > 0 } status && status != "ack")
+        {
+            await WriteStatusAsync(status, cancellationToken).ConfigureAwait(false);
+        }
+
+        static string? StatusText(object? value) => value switch
+        {
+            string s => s,
+            System.Text.Json.JsonElement { ValueKind: System.Text.Json.JsonValueKind.String } je => je.GetString(),
+            null => null,
+            _ => value.ToString(),
+        };
 
         async ValueTask FlushAsync()
         {
