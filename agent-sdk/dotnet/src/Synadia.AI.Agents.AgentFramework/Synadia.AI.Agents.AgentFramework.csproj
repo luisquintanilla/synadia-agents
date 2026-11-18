@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <RootNamespace>Synadia.AI.Agents.AgentFramework</RootNamespace>
+    <PackageId>Synadia.AI.Agents.AgentFramework</PackageId>
+    <Version>0.1.0-preview.1</Version>
+    <Description>Microsoft Agent Framework adapter for the Synadia Agent Protocol for NATS: use a remote NATS agent as a MAF AIAgent (NatsAIAgent), and serve any MAF AIAgent on NATS.</Description>
+    <PackageTags>nats;agents;ai;synadia;microsoft.agents.ai;agent-framework</PackageTags>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Agents.AI.Abstractions" Version="1.28.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Synadia.AI.Agents.AgentFramework.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Synadia.AI.Agents.Service\Synadia.AI.Agents.Service.csproj" />
+  </ItemGroup>
+
+</Project>
+
