@@ -7,6 +7,8 @@ All notable changes to this package are documented here. The format follows
 
 ### Added
 
+- Solution file `Synadia.AI.Agents.slnx` (XML `.slnx` format; needs .NET SDK 9.0.200 or later, and the repo pins 10.0.100). A bare
+  `dotnet build` or `dotnet test` in this folder picks it up.
 - Initial .NET caller SDK for wire protocol v0.3 (`0.1.0-preview.1`, targeting net8.0 and net10.0).
   - **Discovery and liveness.** Discovery uses `$SRV.PING/INFO.agents` (`AgentsClient.DiscoverAsync`,
     `EnumerateAsync`, `LookupAsync`, `PingAsync`). Liveness comes from `agents.hb.*.*.*` (`HeartbeatTracker`).
