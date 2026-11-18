@@ -89,17 +89,30 @@ runs.
 
 ## Examples ([`examples/`](examples/), .NET 10 file-based apps)
 
-| Script | What it does |
-| --- | --- |
-| `run-reference-agent.cs` | Run the .NET `ReferenceAgent` (`ask …`, `fail …`, `slow …`, echo) for any caller to talk to. |
-| `ollama-agent.cs` | Serve a local Ollama model (`qwen3.5:4b`) via `ServeChatClient`, with a free tool and an approval-gated tool. Add `--agent-tools` to let it delegate to other agents. |
+A host-side ladder mirroring the Python and TypeScript agent-sdk examples (same agent names, flags, env vars and demo
+prompts), written MEAI-first: every model is an `IChatClient` served with one `ServeChatClient` call. See
+[`examples/README.md`](examples/README.md) for configuration, expected output and the gaps vs. Python/TS.
 
-### Demo: Ollama agent driven from the TypeScript (and .NET) callers
+| Script | Registers | What it does |
+| --- | --- | --- |
+| `01-echo.cs` | `echo` | Minimal `OnPrompt` agent — replies `echo: <prompt>`. |
+| `02-ollama.cs` | `ollama` | A local Ollama model (OllamaSharp) served with `ServeChatClient`. |
+| `03-openrouter.cs` | `openrouter` | The hosted OpenRouter API through `Microsoft.Extensions.AI.OpenAI` (`OPENAI_BASE_URL` overrides the endpoint). |
+| `04-combined.cs` | `llm` | Ollama or OpenRouter, picked from the env by a function returning `IChatClient`. |
+| `05-tools.cs` | `tools` | A `read_sensor` `AIFunction` backed by a `sensors` NATS microservice in the same file; `FunctionInvokingChatClient` runs the tool loop. |
+| `06-approvals.cs` | `approvals` | A free tool plus an approval-gated tool (`ApprovalRequiredAIFunction` → mid-stream `query`). `--agent-tools` lets it delegate to other agents. |
+| `run-reference-agent.cs` | `demo-agent` | Run the .NET `ReferenceAgent` (`ask …`, `fail …`, `slow …`, echo) for any caller to talk to. |
+
+All of them share `--url`/`NATS_URL`, `--owner`/`--session-name` (the `SYNADIA_<AGENT>_OWNER` > `SYNADIA_OWNER` >
+`NATS_AGENT_OWNER` ladder), `--heartbeat-interval`, `--nkey`/`--creds` and `--sender-identity signed` through
+[`examples/_shared/ExampleHost.cs`](examples/_shared/ExampleHost.cs).
+
+### Demo: approvals agent driven from the TypeScript (and .NET) callers
 
 ```sh
 nats-server &                                                     # or any NATS server; NATS_URL overrides the URL
 ollama pull qwen3.5:4b
-dotnet run agent-sdk/dotnet/examples/ollama-agent.cs              # agents.prompt.ollama.<you>.qwen
+dotnet run agent-sdk/dotnet/examples/06-approvals.cs              # agents.prompt.approvals.<you>.main
 
 # TypeScript caller (build once: cd client-sdk/typescript && bun install && bun run build)
 cd client-sdk/typescript
@@ -112,19 +125,19 @@ bun examples/06-chat.ts
 cd client-sdk/dotnet/examples && dotnet run 06-chat.cs
 ```
 
-The TS examples prompt the *first* discovered agent, so run only the Ollama agent (or filter) during the demo.
+The TS examples prompt the *first* discovered agent, so run only this agent (or filter) during the demo.
 
 The model client is [OllamaSharp](https://github.com/awaescher/OllamaSharp). Its `OllamaApiClient` is an `IChatClient`
 over Ollama's native `/api/chat`, and it replaces the deprecated `Microsoft.Extensions.AI.Ollama` package. The
 environment variables are:
 
-- `OLLAMA_ENDPOINT` (default `http://localhost:11434`). A trailing `/v1` is ignored, so an OpenAI-compatible URL still works.
+- `OLLAMA_URL` / `OLLAMA_ENDPOINT` (default `http://localhost:11434`). A trailing `/v1` is ignored, so an
+  OpenAI-compatible URL still works.
 - `OLLAMA_MODEL` (default `qwen3.5:4b`).
 
 qwen3.5 thinks by default, which is slow. The example sets `ChatOptions.Reasoning = new() { Effort = ReasoningEffort.None }`,
 and OllamaSharp sends that to Ollama as `think: false`. Pass `--think` to keep thinking; the reasoning then reaches the
 caller as `status` chunks.
-
 ## Build and test
 
 ```sh

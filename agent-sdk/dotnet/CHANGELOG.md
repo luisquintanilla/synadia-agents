@@ -31,5 +31,10 @@ All notable changes to these packages are documented here. The format follows
     - `NatsServerProcess`, a `nats-server` on a random free port.
   - **Tests.** End-to-end tests and TS interop in both directions (.NET caller ↔ TS reference agent, TS caller ↔ .NET
     reference agent, including queries and attachments).
-  - **Examples.** `run-reference-agent.cs`, and `ollama-agent.cs` (`ServeChatClient` over a local Ollama model through
-    OllamaSharp's `IChatClient`).
+  - **Examples.** `run-reference-agent.cs`, plus a host-side ladder mirroring the Python/TS agent-sdk examples
+    (`examples/README.md`): `01-echo`, `02-ollama` (OllamaSharp), `03-openrouter` (`Microsoft.Extensions.AI.OpenAI`,
+    `OPENAI_BASE_URL` override), `04-combined` (`llm`), `05-tools` (`read_sensor` `AIFunction` backed by a `sensors`
+    NATS microservice) and `06-approvals` (formerly `ollama-agent.cs`; agent `approvals`, session `main`: an
+    approval-gated tool round-trips as a query). The shared `_shared/ExampleHost.cs` provides `--url`, `--owner`/
+    `--session-name` with the `SYNADIA_<AGENT>_OWNER` ladder, `--heartbeat-interval`, `--nkey`/`--creds` and
+    `--sender-identity signed`.

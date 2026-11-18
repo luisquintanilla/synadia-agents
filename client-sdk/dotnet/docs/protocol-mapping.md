@@ -85,12 +85,12 @@ The caller subscribes to the reply inbox with `NatsSubChannelOpts { FullMode = W
 | --- | --- | --- |
 | Is `InputRequestContent` non-sealed and stable? | Non-sealed and GA in 11.0.0 (as is `InputResponseContent`). | `AgentQueryContent` derives from it, as designed. |
 | Can we subclass `ToolApprovalRequestContent`? | Sealed (GA), and so is `ToolApprovalResponseContent`. | Approvals are not modelled as queries on the caller side. On the host, `ServeChatClient` translates approvals to and from queries. |
-| `ApprovalRequiredAIFunction` | Sealed GA wrapper. | Usable as-is for the approval demo (`examples/ollama-agent.cs`). |
+| `ApprovalRequiredAIFunction` | Sealed GA wrapper. | Usable as-is for the approval demo (`agent-sdk/dotnet/examples/06-approvals.cs`). |
 | Can `AIFunction` report a verbatim JSON schema? | `AIFunctionDeclaration.JsonSchema`, `Name` and `Description` are virtual. | `AgentToolFunction` returns the fixture schema verbatim (byte-equal tests). |
 | Is `FunctionInvokingChatClient` in Abstractions? | No, it is in `Microsoft.Extensions.AI`. | The core does not depend on it. `AgentToolFunction` has no tool-call id, so detached-call ids are generated. Hosts add `.UseFunctionInvocation()` themselves. |
 | `AIJsonUtilities.DefaultOptions` | Writes indented JSON. | Wire JSON uses our own source-generated contexts and `Utf8JsonWriter`, never MEAI's options. |
 | Portable reasoning control | `ChatOptions.Reasoning` / `ReasoningEffort` exist in 11.0.0. | The Ollama demo uses `ReasoningEffort.None` (qwen3.5 otherwise thinks for minutes). OllamaSharp 5.5.2 maps it to Ollama's native `think: false`, which was checked by capturing the `/api/chat` request body, so no provider-specific `RawRepresentationFactory` is needed. |
-| Ollama client | OllamaSharp 5.5.2 is the newest release. It is compiled against MEAI.Abstractions 10.8 and binds to 11.0.0 at runtime with no load errors. | `examples/ollama-agent.cs` uses `OllamaApiClient` as its `IChatClient` (`Microsoft.Extensions.AI.Ollama` is deprecated). |
+| Ollama client | OllamaSharp 5.5.2 is the newest release. It is compiled against MEAI.Abstractions 10.8 and binds to 11.0.0 at runtime with no load errors. | `agent-sdk/dotnet/examples/06-approvals.cs` uses `OllamaApiClient` as its `IChatClient` (`Microsoft.Extensions.AI.Ollama` is deprecated). |
 
 ## Sender identity (§13, additive)
 

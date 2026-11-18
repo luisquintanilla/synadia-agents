@@ -173,7 +173,7 @@ Both directions passed on one `nats-server`:
   - `02-prompt-text.py`.
   - `03-prompt-attachment.py`: an attachment round trip.
   - `04-query-reply.py`: a mid-stream query and reply, with the prompt `ask …`.
-- **Python caller → .NET Ollama agent** (`ollama-agent.cs`). `02-prompt-text.py` streamed the model's answer.
+- **Python caller → .NET Ollama agent** (`06-approvals.cs`, formerly `ollama-agent.cs`). `02-prompt-text.py` streamed the model's answer.
 
 On Windows, the Python reference agent stops at startup: `loop.add_signal_handler` raises `NotImplementedError`. Run it on
 Linux or macOS, or through a wrapper that replaces `asyncio.BaseEventLoop.add_signal_handler` with a no-op.

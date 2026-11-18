@@ -143,7 +143,7 @@ await service.stop();
 await nc.close();
 ```
 
-**Try it now:** [`agent-sdk/typescript/examples/01-echo.ts`](agent-sdk/typescript/examples/01-echo.ts) is this code packaged as a runnable script — `bun agent-sdk/typescript/examples/01-echo.ts` (with `$NATS_CONTEXT`, `$NATS_URL`, or localhost fallback). Both SDKs ship a parallel **agent ladder** (`01-echo` → `05-tools`: echo, Ollama, OpenRouter, combined, tool-calling) — TS in [`agent-sdk/typescript/examples/`](agent-sdk/typescript/examples/), Python in [`agent-sdk/python/examples/`](agent-sdk/python/examples/).
+**Try it now:** [`agent-sdk/typescript/examples/01-echo.ts`](agent-sdk/typescript/examples/01-echo.ts) is this code packaged as a runnable script — `bun agent-sdk/typescript/examples/01-echo.ts` (with `$NATS_CONTEXT`, `$NATS_URL`, or localhost fallback). The TS, Python and .NET SDKs ship a parallel **agent ladder** (`01-echo` → `05-tools`: echo, Ollama, OpenRouter, combined, tool-calling) — TS in [`agent-sdk/typescript/examples/`](agent-sdk/typescript/examples/), Python in [`agent-sdk/python/examples/`](agent-sdk/python/examples/), .NET in [`agent-sdk/dotnet/examples/`](agent-sdk/dotnet/examples/) (plus `06-approvals`: an approval-gated tool as a mid-stream query).
 
 For full install, error handling, and longer examples see the per-package READMEs: caller — [`client-sdk/typescript/`](client-sdk/typescript/) · [`client-sdk/python/`](client-sdk/python/) · [`client-sdk/dotnet/`](client-sdk/dotnet/); host — [`agent-sdk/typescript/`](agent-sdk/typescript/) · [`agent-sdk/python/`](agent-sdk/python/) · [`agent-sdk/dotnet/`](agent-sdk/dotnet/). C# quickstarts are in [`client-sdk/README.md`](client-sdk/README.md) and [`agent-sdk/README.md`](agent-sdk/README.md).
 
