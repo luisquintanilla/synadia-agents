@@ -66,6 +66,7 @@ End-to-end apps built on the SDKs — browser clients, controllers that spawn ep
 | [`dspy/`](examples/dspy/) | agent | From-scratch DSPy-style **ReAct** agent on `AgentService` with four sandboxed filesystem tools. Registers as token `dspy`. |
 | [`dspy-research-agent/`](examples/dspy-research-agent/) | agent | From-scratch DSPy-style **deep-research** agent on ax-llm's RLM — a sandboxed JS REPL with recursive `llmQuery()` sub-calls and pluggable web search (Tavily/Exa + neural `findSimilar`). Registers as token `research`. |
 | [`open-agent-vercel/`](examples/open-agent-vercel/) | agent | Runs the [`agents/open-agent/`](agents/open-agent/) bridge against `@vercel/sandbox` instead of its built-in LocalSandbox — same `runBridge`, same wire behaviour, only the sandbox factory changes. |
+| [`dotnet-document-agent/`](examples/dotnet-document-agent/) | agent | .NET 10 **document extraction agent** served with the .NET SDK (`ServeChatClient`). Turns PDF/image/text attachments into markdown (headings + GFM tables) or indexes them for RAG answers, using `Microsoft.Extensions.AI`/DocumentExtraction/DataIngestion/VectorData and local Ollama models. Registers as token `docs`; TS and Python callers included. Not published. |
 
 ## Wire protocol at a glance
 
@@ -189,7 +190,8 @@ synadia-agents/
     ├── pi-headless/              ← spawn/stop many PI sessions
     ├── dspy/                     ← from-scratch agent (ax-llm ReAct, token `dspy`)
     ├── dspy-research-agent/      ← from-scratch deep-research agent (ax-llm RLM + web search, token `research`)
-    └── open-agent-vercel/        ← runs the open-agent bridge against @vercel/sandbox
+    ├── open-agent-vercel/        ← runs the open-agent bridge against @vercel/sandbox
+    └── dotnet-document-agent/    ← .NET document-extraction agent (markdown + RAG, .NET SDK)
 ```
 
 Each subtree has its own `README.md` and the index READMEs (`client-sdk/README.md`, `agent-sdk/README.md`, `agents/README.md`, `examples/README.md`) describe what lives at each level. See [`README-DEV.md`](README-DEV.md) for local-dev build and install recipes.

@@ -86,6 +86,7 @@ SDKs are missing).
 | `examples/pi-headless/` | `@synadia-ai/nats-pi-headless` | npm (public) | depends on `@synadia-ai/agents@^0.5.x` |
 | `examples/agent-web-ui/` | `@synadia-ai/nats-ai-testui` | github only | local-clone test client; `private: true` so it never publishes |
 | `examples/dspy/` | `@synadia-ai/nats-dspy-agent` | private | uses `file:` link to local SDK |
+| `examples/dotnet-document-agent/` | — (.NET projects `IsPackable=false`; callers `private: true`) | not published | .NET document extraction agent; references the in-repo .NET SDK by project path, TS/Python callers use the published SDKs |
 
 **No root `package.json`, no workspace manager.** Each subtree manages
 its own deps and tooling. Examples that ship to npm pin the SDK by
