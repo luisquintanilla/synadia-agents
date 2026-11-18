@@ -15,7 +15,7 @@ They form a ladder — each rung is the one before plus a little more:
 | [`01-echo.cs`](01-echo.cs) | `echo` | Minimal agent on `AgentService.OnPrompt` — replies `echo: <prompt>`. |
 | [`02-ollama.cs`](02-ollama.cs) | `ollama` | A local Ollama model (OllamaSharp's `IChatClient`) served with **one call**: `ServeChatClient(client)`. |
 | [`03-openrouter.cs`](03-openrouter.cs) | `openrouter` | Same again, but the backend is the hosted, OpenAI-compatible OpenRouter API (`Microsoft.Extensions.AI.OpenAI`). |
-| [`04-combined.cs`](04-combined.cs) | `llm` | Ollama **or** OpenRouter, auto-selected from the env — by a ten-line function that returns an `IChatClient`. |
+| [`04-combined.cs`](04-combined.cs) | `llm` | Ollama **or** OpenRouter, auto-selected from the env; with a key, MEAI's `OrderedFailoverChatClient` falls back from OpenRouter to Ollama. |
 | [`05-tools.cs`](05-tools.cs) | `tools` | A `read_sensor` tool (`AIFunctionFactory`) whose body is one NATS request to a `sensors` microservice; `FunctionInvokingChatClient` runs the tool loop. |
 | [`06-approvals.cs`](06-approvals.cs) | `approvals` | Beyond the shared ladder: an approval-gated tool (`ApprovalRequiredAIFunction`) becomes a mid-stream `query` to the caller; `--agent-tools` lets the model discover and prompt other agents. |
 
@@ -31,8 +31,8 @@ The ladder is the same; the idiom is Microsoft.Extensions.AI (MEAI):
 - **Every model is just an `IChatClient`.** `02`–`06` never touch HTTP or a provider's wire format: OllamaSharp,
   `Microsoft.Extensions.AI.OpenAI` (and anything else with an MEAI adapter) plug into the same
   `service.ServeChatClient(client, options)` call, which handles streaming, status chunks, history and error chunks.
-  So `04-combined.cs` has no `llm.py`/`llm.ts`-style client abstraction — the backend selector is a local function
-  returning `IChatClient`. (File-based apps can't share loose `.cs` files; the selector is inlined.)
+  So `04-combined.cs` has no `llm.py`/`llm.ts`-style client abstraction. Choosing between backends is MEAI routing
+  (`RoutingChatClient` and friends), and a router is itself an `IChatClient`, so serving it is the same call.
 - **Tools are plain C# methods.** `05-tools.cs` turns `ReadSensor(string location)` into an `AIFunction` with
   `AIFunctionFactory.Create`, and `.UseFunctionInvocation()` runs the call-tool-and-resume loop for as many rounds as
   the model needs, instead of the hand-rolled two round trips in the Python/TS versions.
@@ -77,7 +77,7 @@ registered subject token uppercased with hyphens turned into underscores — `01
 | `NATS_SENDER_IDENTITY` | `--sender-identity` | all | `off` | `off` / `signed`. Signed registers `user_nkey` / `account` / `id_sig`, signed with the same seed/creds as the connection. |
 | `OLLAMA_URL` (alias `OLLAMA_ENDPOINT`) | — | `02`, `04`, `05`, `06` | `http://localhost:11434` | Where Ollama is listening. A trailing `/v1` (the OpenAI-compatible URL) is stripped. |
 | `OLLAMA_MODEL` | — | `02`, `04`, `05`, `06` | `qwen3.5:4b` | Which Ollama model to prompt. |
-| `OPENROUTER_API_KEY` | — | `03`, `04` | _(required for `03`)_ | Your OpenRouter key. In `04` its presence selects OpenRouter. |
+| `OPENROUTER_API_KEY` | — | `03`, `04` | _(required for `03`)_ | Your OpenRouter key. In `04` its presence makes OpenRouter the primary route, with Ollama as failover. |
 | `OPENROUTER_MODEL` | — | `03`, `04` | `openai/gpt-4o-mini` | Any [OpenRouter model](https://openrouter.ai/models). |
 | `OPENAI_BASE_URL` | — | `03`, `04` | `https://openrouter.ai/api/v1` | Override the OpenAI-compatible endpoint (e.g. Ollama's `http://localhost:11434/v1`). With it set, `03` runs without a key. |
 
@@ -88,6 +88,9 @@ registered subject token uppercased with hyphens turned into underscores — `01
 - No credentials in the URL userinfo, and the URL falls back to `nats://127.0.0.1:4222` (like the .NET caller
   examples) instead of erroring when nothing is configured.
 - `05-tools.cs` and `06-approvals.cs` are Ollama-only (as in Python/TS for `05`).
+
+**Intentional deviation:** with an OpenRouter key, `04-combined.cs` adds failover to Ollama; Python/TS use OpenRouter
+alone. Without a key the behavior is identical.
 
 ## Run
 
@@ -161,17 +164,44 @@ OPENAI_BASE_URL=http://localhost:11434/v1 OPENROUTER_MODEL=qwen3.5:4b dotnet run
 Registers as `openrouter`. **Real OpenRouter was not exercised** when these examples were written (no key); the
 example was verified end to end against Ollama's OpenAI-compatible `/v1` endpoint via `OPENAI_BASE_URL`.
 
-### `04-combined.cs` — Ollama **or** OpenRouter
+### `04-combined.cs` — Ollama **or** OpenRouter, with failover
 
-| Condition | Backend |
+| Condition | Served client |
 | --- | --- |
-| `OPENROUTER_API_KEY` is set | **OpenRouter** (`OPENROUTER_MODEL`, default `openai/gpt-4o-mini`; `OPENAI_BASE_URL` honored) |
-| otherwise | **local Ollama** (`OLLAMA_MODEL`, default `qwen3.5:4b`; `OLLAMA_URL`) |
+| `OPENROUTER_API_KEY` is set | `OrderedFailoverChatClient([openRouter, ollama])`: **OpenRouter** first (`OPENROUTER_MODEL`, default `openai/gpt-4o-mini`; `OPENAI_BASE_URL` honored), then **local Ollama** |
+| otherwise | **local Ollama** alone (`OLLAMA_MODEL`, default `qwen3.5:4b`; `OLLAMA_URL`) |
 
-The chosen backend is printed on startup, e.g. `backend: ollama/qwen3.5:4b`. Registers as `llm`. The Ollama branch
-adds `think: false` with standard MEAI middleware
-(`new ChatClientBuilder(ollama).ConfigureOptions(o => o.Reasoning ??= …)`), so the agent code never knows which
-backend it got.
+Registers as `llm` and prints the chain on startup, e.g. `backend: openrouter/openai/gpt-4o-mini → ollama/qwen3.5:4b
+(failover)` or `backend: ollama/qwen3.5:4b`.
+
+Failover uses MEAI's routing clients (`Microsoft.Extensions.AI` 11, `[Experimental]` under `MEAI001`, suppressed
+around the one constructor call). If OpenRouter fails **before any output streams** (bad key, 429, outage), the same
+prompt goes to Ollama. The OpenAI client's own retries are off, so the chain fails over at once. A failure **after**
+output has started is terminal, and the caller gets an error chunk: MEAI never retracts a partial answer. Each failure
+and failover is logged to stderr:
+
+```
+route openrouter/openai/gpt-4o-mini failed: ClientResultException: HTTP 401 (: )
+Missing Authentication header
+failover: answering with ollama/qwen3.5:4b
+```
+
+(`OrderedFailoverChatClient` is sealed, so the log comes from a small `ChatClientBuilder.Use` middleware on each route.
+To subclass, derive from `FailoverChatClient` and override `OnRoutingUpdateAsync`.) Each route keeps its own tuning
+on its own client: Ollama's `think: false` is a `ConfigureOptions` on the Ollama route only, so it never reaches the
+OpenRouter request.
+
+Try the failover without a key:
+
+```sh
+OPENROUTER_API_KEY=dummy OPENAI_BASE_URL=http://127.0.0.1:1/v1 dotnet run 04-combined.cs   # dead primary → Ollama
+```
+
+**Next step: per-request routing.** Failover picks by availability. To pick by request, use
+`RoutingChatClient.Create((context, ct) => …)`, which selects a client from the messages and options, or
+`SemanticRoutingChatClient`, which matches the prompt against example utterances per client and so needs an
+embedding model. Both are `IChatClient`s and are served the same way. They are not used here because they would
+change the Python/TS contract (key ⇒ OpenRouter).
 
 ### `05-tools.cs` — give the agent a tool backed by a microservice
 

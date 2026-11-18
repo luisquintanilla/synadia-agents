@@ -98,7 +98,7 @@ prompts), written MEAI-first: every model is an `IChatClient` served with one `S
 | `01-echo.cs` | `echo` | Minimal `OnPrompt` agent — replies `echo: <prompt>`. |
 | `02-ollama.cs` | `ollama` | A local Ollama model (OllamaSharp) served with `ServeChatClient`. |
 | `03-openrouter.cs` | `openrouter` | The hosted OpenRouter API through `Microsoft.Extensions.AI.OpenAI` (`OPENAI_BASE_URL` overrides the endpoint). |
-| `04-combined.cs` | `llm` | Ollama or OpenRouter, picked from the env by a function returning `IChatClient`. |
+| `04-combined.cs` | `llm` | Ollama, or OpenRouter when a key is set. With a key it serves MEAI's `OrderedFailoverChatClient`, which falls back to Ollama if OpenRouter fails before streaming. Failover is the one deliberate deviation from Python/TS. |
 | `05-tools.cs` | `tools` | A `read_sensor` `AIFunction` backed by a `sensors` NATS microservice in the same file; `FunctionInvokingChatClient` runs the tool loop. |
 | `06-approvals.cs` | `approvals` | A free tool plus an approval-gated tool (`ApprovalRequiredAIFunction` → mid-stream `query`). `--agent-tools` lets it delegate to other agents. |
 | `run-reference-agent.cs` | `demo-agent` | Run the .NET `ReferenceAgent` (`ask …`, `fail …`, `slow …`, echo) for any caller to talk to. |
