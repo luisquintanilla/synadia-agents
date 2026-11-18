@@ -40,6 +40,14 @@ public sealed class ChatClientServeOptions
 
     /// <summary>Maximum approval round trips within one prompt (default 8).</summary>
     public int MaxApprovalRounds { get; init; } = 8;
+
+    /// <summary>
+    /// Let the model delegate to other agents on the network: the tools of <see cref="Tools.AgentTools"/> are added to
+    /// every model call, and each prompt runs in its own call scope (<see cref="Tools.AgentTools.RunInPromptScopeAsync{T}"/>),
+    /// so calls the model starts end with the prompt and the agent that sent the prompt cannot be prompted back. The
+    /// chat client must invoke functions itself (e.g. <c>.UseFunctionInvocation()</c>); the helper is not disposed here.
+    /// </summary>
+    public Tools.AgentTools? AgentTools { get; init; }
 }
 
 /// <summary>Host any <see cref="IChatClient"/> as a protocol agent.</summary>
@@ -75,7 +83,26 @@ public static class ChatClientAgentExtensions
         private static readonly JsonSerializerOptions Compact = new(AIJsonUtilities.DefaultOptions) { WriteIndented = false };
         private readonly ConcurrentDictionary<string, Conversation> _conversations = new(StringComparer.Ordinal);
 
-        public async Task HandleAsync(PromptContext context, PromptStream stream, CancellationToken cancellationToken)
+        private readonly IList<AITool>? _agentTools = options.AgentTools?.AsAITools();
+
+        public Task HandleAsync(PromptContext context, PromptStream stream, CancellationToken cancellationToken)
+            => options.AgentTools is { } tools
+                ? tools.RunInPromptScopeAsync(() => HandleCoreAsync(context, stream, cancellationToken), CallerOf(context))
+                : HandleCoreAsync(context, stream, cancellationToken);
+
+        private static string? CallerOf(PromptContext context)
+            => context.Sender is Synadia.AI.Agents.Identity.VerifiedSender verified ? verified.Id.ToString() : null;
+
+        private ChatOptions? ChatOptionsForCall()
+        {
+            var chatOptions = options.ChatOptions?.Clone();
+            if (_agentTools is null) return chatOptions;
+            chatOptions ??= new ChatOptions();
+            chatOptions.Tools = [.. chatOptions.Tools ?? [], .. _agentTools];
+            return chatOptions;
+        }
+
+        private async Task HandleCoreAsync(PromptContext context, PromptStream stream, CancellationToken cancellationToken)
         {
             var key = options.ConversationKey?.Invoke(context) ?? "";
             var conversation = _conversations.GetOrAdd(key, _ => new Conversation());
@@ -92,7 +119,7 @@ public static class ChatClientAgentExtensions
 
                     var updates = new List<ChatResponseUpdate>();
                     var approvals = new List<ToolApprovalRequestContent>();
-                    await foreach (var update in client.GetStreamingResponseAsync(messages, options.ChatOptions?.Clone(), cancellationToken)
+                    await foreach (var update in client.GetStreamingResponseAsync(messages, ChatOptionsForCall(), cancellationToken)
                         .ConfigureAwait(false))
                     {
                         updates.Add(update);

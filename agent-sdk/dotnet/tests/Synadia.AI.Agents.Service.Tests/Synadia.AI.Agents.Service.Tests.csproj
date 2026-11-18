@@ -17,6 +17,7 @@
   <ItemGroup>
     <Using Include="Xunit" />
     <None Update="interop\ts-interop.ts" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\..\test-fixtures\identity\**\*" Exclude="..\..\..\..\test-fixtures\identity\operator\node_modules\**" LinkBase="fixtures\identity" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

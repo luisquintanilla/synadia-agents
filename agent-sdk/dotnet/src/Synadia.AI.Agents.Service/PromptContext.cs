@@ -7,13 +7,22 @@ namespace Synadia.AI.Agents.Service;
 /// <summary>The inbound side of one prompt request: the decoded envelope plus transport details.</summary>
 public sealed class PromptContext
 {
-    internal PromptContext(PromptEnvelope envelope, string subject, NatsHeaders? headers, AgentSubject agent)
+    internal PromptContext(PromptEnvelope envelope, string subject, NatsHeaders? headers, AgentSubject agent,
+        Synadia.AI.Agents.Identity.SenderInfo? sender = null)
     {
         Envelope = envelope;
         Subject = subject;
         Headers = headers;
         Agent = agent;
+        Sender = sender;
     }
+
+    /// <summary>
+    /// The classified sender (§13): a <see cref="Synadia.AI.Agents.Identity.VerifiedSender"/> whose signature checked
+    /// out, a <see cref="Synadia.AI.Agents.Identity.ClaimedSender"/> (unsigned claim — not authenticated), or
+    /// <c>null</c> when the request carried no <c>Agent-Sender</c> header.
+    /// </summary>
+    public Synadia.AI.Agents.Identity.SenderInfo? Sender { get; }
 
     /// <summary>The decoded §5.1 envelope.</summary>
     public PromptEnvelope Envelope { get; }

@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NATS.Client.Core;
+using Synadia.AI.Agents.Identity;
 
 namespace Synadia.AI.Agents;
 
@@ -30,6 +31,7 @@ public sealed class AgentsClient : IAsyncDisposable
         Options = options ?? new AgentsClientOptions();
         Logger = Options.Logger ?? NullLogger.Instance;
         Heartbeats = new HeartbeatTracker(connection, Logger, Options.TimeProvider);
+        if (Options.Identity is { } identity) Identity = new IdentityContext(connection, identity, Options.TimeProvider);
     }
 
     /// <summary>The underlying NATS connection.</summary>
@@ -43,6 +45,39 @@ public sealed class AgentsClient : IAsyncDisposable
 
     internal ILogger Logger { get; }
 
+    internal IdentityContext? Identity { get; }
+
+    /// <summary>
+    /// The connection's own agent ID (<c>{account}.{user}</c>) from <c>$SYS.REQ.USER.INFO</c>, memoised per connection
+    /// (failures retried after 30 s, dropped on reconnect). A configured signer must match the live identity.
+    /// </summary>
+    /// <exception cref="NoIdentityException">The connection has no NKEY user.</exception>
+    /// <exception cref="IdentityUnavailableException">The server did not answer usefully.</exception>
+    /// <exception cref="IdentityMismatchException">The configured signer belongs to a different user / account.</exception>
+    public Task<AgentId> GetSelfIdAsync(CancellationToken cancellationToken = default)
+        => Identity?.SelfIdAsync(cancellationToken) ?? SelfId.LookupAsync(Connection, cancellationToken: cancellationToken);
+
+    /// <summary>Force a fresh identity lookup, discarding the memoised answer.</summary>
+    public Task<AgentId> RefreshSelfIdAsync(CancellationToken cancellationToken = default)
+        => Identity?.RefreshAsync(cancellationToken) ?? SelfId.LookupAsync(Connection, cancellationToken: cancellationToken);
+
+    /// <summary>
+    /// Build a complete signed <c>Agent-Sender</c> header value for a publish of <paramref name="payload"/> to
+    /// <paramref name="subject"/> (any publish, JetStream included). Set <paramref name="sub"/> only behind a rename by
+    /// your own account.
+    /// </summary>
+    /// <exception cref="SenderSignatureRequiredException">No signer is configured.</exception>
+    public async Task<string> SignSenderAsync(string subject, ReadOnlyMemory<byte> payload, string? sub = null, string? nonce = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(subject);
+        if (Identity?.Signer is not { } signer) throw new SenderSignatureRequiredException(subject);
+        if (nonce is not null && !SenderHeader.IsValidNonce(nonce)) throw new IdentityException("nonce must match [A-Za-z0-9_-]{1,64}");
+        var id = await Identity.SelfIdAsync(cancellationToken).ConfigureAwait(false);
+        var header = await SenderHeader.SignAsync(signer, id, sub ?? subject, payload, Identity.Name, nonce: nonce,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+        return SenderHeader.Serialize(header);
+    }
     /// <summary>
     /// Discover running agents via <c>$SRV.INFO.agents</c> (§4.3). Starts the heartbeat tracker first so the
     /// subscription is in place before discovery (§8.5). Instances are de-duplicated by id.
@@ -50,6 +85,7 @@ public sealed class AgentsClient : IAsyncDisposable
     public async Task<IReadOnlyList<Agent>> DiscoverAsync(AgentFilter? filter = null, CancellationToken cancellationToken = default)
     {
         await Heartbeats.StartAsync(cancellationToken).ConfigureAwait(false);
+        Identity?.Kickoff();
         var infos = await EnumerateAsync(cancellationToken).ConfigureAwait(false);
         return infos.Where(i => filter is null || filter.Matches(i)).Select(i => new Agent(this, i)).ToArray();
     }
@@ -156,5 +192,9 @@ public sealed class AgentsClient : IAsyncDisposable
     }
 
     /// <summary>Stops the heartbeat tracker. Does not close the NATS connection.</summary>
-    public ValueTask DisposeAsync() => Heartbeats.DisposeAsync();
+    public ValueTask DisposeAsync()
+    {
+        Identity?.Dispose();
+        return Heartbeats.DisposeAsync();
+    }
 }

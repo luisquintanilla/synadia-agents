@@ -25,6 +25,13 @@ public sealed class AgentsClientOptions
 
     /// <summary>Optional clock (tests).</summary>
     public TimeProvider? TimeProvider { get; set; }
+
+    /// <summary>
+    /// Sender identity (§13). <c>null</c> (the default) sends no <c>Agent-Sender</c> header; set a
+    /// <see cref="Identity.SenderIdentityOptions"/> with a signer to sign every prompt and status request, or without
+    /// one to send an unsigned claim.
+    /// </summary>
+    public Identity.SenderIdentityOptions? Identity { get; set; }
 }
 
 /// <summary>Discovery filter; all set fields must match exactly (§4.3).</summary>
@@ -69,6 +76,12 @@ public sealed class PromptOptions
     /// </summary>
     public bool IncludeAcks { get; set; }
 
-    /// <summary>Extra request headers.</summary>
+    /// <summary>Extra request headers. An <c>Agent-Sender</c> entry is replaced by the SDK's own when identity is enabled.</summary>
     public IReadOnlyDictionary<string, string>? Headers { get; set; }
+
+    /// <summary>
+    /// The subject the <c>Agent-Sender</c> signature covers. Defaults to the prompt subject; set it only when your own
+    /// account renames the subject on the way to the agent (sign the exporter's subject).
+    /// </summary>
+    public string? Sub { get; set; }
 }
