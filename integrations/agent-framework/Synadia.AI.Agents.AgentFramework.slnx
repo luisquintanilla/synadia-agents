@@ -4,6 +4,10 @@
     <Project Path="../../agent-sdk/dotnet/src/Synadia.AI.Agents.Service/Synadia.AI.Agents.Service.csproj" />
     <Project Path="../../agent-sdk/dotnet/src/Synadia.AI.Agents.Testing/Synadia.AI.Agents.Testing.csproj" />
   </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/CopilotNatsAgent/CopilotNatsAgent.csproj" />
+    <Project Path="samples/MafNatsDemo/MafNatsDemo.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/Synadia.AI.Agents.AgentFramework/Synadia.AI.Agents.AgentFramework.csproj" />
   </Folder>
