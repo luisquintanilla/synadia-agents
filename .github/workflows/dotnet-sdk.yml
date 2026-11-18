@@ -9,6 +9,7 @@ on:
       - "client-sdk/typescript/**"
       - "agent-sdk/typescript/**"
       - "test-fixtures/**"
+      - "examples/dotnet-document-agent/**"
       - ".github/workflows/dotnet-sdk.yml"
   pull_request:
     paths:
@@ -17,6 +18,7 @@ on:
       - "client-sdk/typescript/**"
       - "agent-sdk/typescript/**"
       - "test-fixtures/**"
+      - "examples/dotnet-document-agent/**"
       - ".github/workflows/dotnet-sdk.yml"
 
 concurrency:
@@ -64,6 +66,11 @@ jobs:
       - name: Host SDK — build + test (incl. e2e and interop)
         working-directory: agent-sdk/dotnet
         run: dotnet test -c Release
+      # The document agent targets net10.0 and restores its preview providers from nuget.org. Its NATS end-to-end
+      # tests use fake models and the nats-server installed above; its Ollama tests skip because CI has no Ollama.
+      - name: Document agent example — build + test
+        working-directory: examples/dotnet-document-agent
+        run: dotnet test --solution DocumentAgent.slnx -c Release
       - name: Build examples (file-based apps)
         run: |
           for f in client-sdk/dotnet/examples/*.cs agent-sdk/dotnet/examples/*.cs; do

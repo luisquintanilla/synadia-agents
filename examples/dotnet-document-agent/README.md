@@ -71,6 +71,8 @@ dotnet test --solution DocumentAgent.slnx   # 39 tests; Ollama tests skip withou
 dotnet run --project src/DocumentExtraction.Harness -- demo
 ```
 
+CI builds it and runs the tests with `nats-server` installed and no Ollama, so the Ollama tests skip.
+
 Harness commands (`document-agent` is the harness executable):
 
 | Command | What it does |

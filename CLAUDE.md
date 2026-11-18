@@ -319,8 +319,10 @@ token that doesn't surface the permissions sub-object at all.)
   - `dotnet-sdk.yml` — builds and tests the .NET caller and host SDKs
     (net8.0 + net10.0) against a real `nats-server`, runs the TS↔.NET
     interop tests (it builds both TS SDKs first), and builds every
-    file-based example. Triggers on `client-sdk/dotnet/**`,
-    `agent-sdk/dotnet/**`, both TS SDKs and `test-fixtures/**`. It
+    file-based example. It also builds and tests
+    `examples/dotnet-document-agent` (its Ollama tests skip). Triggers on
+    `client-sdk/dotnet/**`, `agent-sdk/dotnet/**`, both TS SDKs,
+    `test-fixtures/**` and `examples/dotnet-document-agent/**`. It
     does not publish anything.
 - **No automated TS publish workflow.** TS releases are manual (see
   release ladder). The TypeScript agent CI workflow validates npm package
