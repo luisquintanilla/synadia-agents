@@ -1,0 +1,19 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <IsPackable>false</IsPackable>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!--
+      Experimental opt-ins, deliberate for this whole example:
+        CTDE0001   CommunityToolkit.DocumentExtraction.*
+        MEDE0001   Microsoft.Extensions.DocumentExtraction
+        EXTEXP0019 Microsoft.Extensions.Documents
+        MEDI001    Microsoft.Extensions.DataIngestion
+        MEAI001    Microsoft.Extensions.AI experimental members
+    -->
+    <NoWarn>$(NoWarn);CTDE0001;MEDE0001;EXTEXP0019;MEDI001;MEAI001</NoWarn>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Synadia.Examples.DocumentAgent.Tests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DocumentExtraction.Host\DocumentExtraction.Host.csproj" />
+    <ProjectReference Include="..\..\..\..\client-sdk\dotnet\src\Synadia.AI.Agents\Synadia.AI.Agents.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Reuse the deterministic embedder and scripted chat client from the Core tests. -->
+    <Compile Include="..\DocumentExtraction.Core.Tests\TestSupport.cs" Link="TestSupport.cs" />
+    <None Include="..\..\fixtures\**" LinkBase="fixtures" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

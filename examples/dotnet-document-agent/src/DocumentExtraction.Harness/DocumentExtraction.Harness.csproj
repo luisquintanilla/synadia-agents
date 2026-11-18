@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Synadia.Examples.DocumentAgent.Harness</RootNamespace>
+    <AssemblyName>document-agent</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DocumentExtraction.Core\DocumentExtraction.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="OllamaSharp" />
+    <PackageReference Include="PdfPig" />
+    <PackageReference Include="SkiaSharp" />
+  </ItemGroup>
+</Project>

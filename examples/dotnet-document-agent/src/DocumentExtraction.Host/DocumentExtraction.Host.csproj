@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Synadia.Examples.DocumentAgent.Host</RootNamespace>
+    <AssemblyName>document-agent-host</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DocumentExtraction.Core\DocumentExtraction.Core.csproj" />
+    <!-- In-repo .NET SDK (not published yet); the Testing package supplies the throw-away nats-server for embedded-nats mode. -->
+    <ProjectReference Include="..\..\..\..\agent-sdk\dotnet\src\Synadia.AI.Agents.Service\Synadia.AI.Agents.Service.csproj" />
+    <ProjectReference Include="..\..\..\..\agent-sdk\dotnet\src\Synadia.AI.Agents.Testing\Synadia.AI.Agents.Testing.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="OllamaSharp" />
+  </ItemGroup>
+</Project>

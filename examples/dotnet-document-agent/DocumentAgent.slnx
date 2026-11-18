@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="../../agent-sdk/dotnet/src/Synadia.AI.Agents.Service/Synadia.AI.Agents.Service.csproj" />
+    <Project Path="../../agent-sdk/dotnet/src/Synadia.AI.Agents.Testing/Synadia.AI.Agents.Testing.csproj" />
+    <Project Path="../../client-sdk/dotnet/src/Synadia.AI.Agents/Synadia.AI.Agents.csproj" />
+    <Project Path="src/DocumentExtraction.Core/DocumentExtraction.Core.csproj" />
+    <Project Path="src/DocumentExtraction.Harness/DocumentExtraction.Harness.csproj" />
+    <Project Path="src/DocumentExtraction.Host/DocumentExtraction.Host.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DocumentExtraction.Core.Tests/DocumentExtraction.Core.Tests.csproj" />
+    <Project Path="tests/DocumentExtraction.Host.Tests/DocumentExtraction.Host.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,28 @@
+{
+  "lockfileVersion": 2,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "document-agent-ts-caller",
+      "dependencies": {
+        "@nats-io/transport-node": "^3.1.0",
+        "@synadia-ai/agents": "^0.5.2",
+      },
+    },
+  },
+  "packages": {
+    "@nats-io/nats-core": ["@nats-io/nats-core@3.4.0", "", { "dependencies": { "@nats-io/nkeys": "2.0.3", "@nats-io/nuid": "3.0.0" } }, "sha1-YYvEqB7oX/crn91hPYYY8umXvgc="],
+
+    "@nats-io/nkeys": ["@nats-io/nkeys@2.0.3", "", { "dependencies": { "tweetnacl": "^1.0.3" } }, "sha1-N86HJeB1AzICycpgk7sixKGYlDA="],
+
+    "@nats-io/nuid": ["@nats-io/nuid@3.0.0", "", {}, "sha1-l3y3uZnV3I302fYa7S0jX81SWdw="],
+
+    "@nats-io/services": ["@nats-io/services@3.4.0", "", { "dependencies": { "@nats-io/nats-core": "3.4.0" } }, "sha512-hS9l4F5VCbdg4u7/qgEUU9gtQ+ZOLJxtj+lJj0oSw7Okkm0fLkYq6odbobFa50IGkghfLrzag95dWHSF8F8+CA=="],
+
+    "@nats-io/transport-node": ["@nats-io/transport-node@3.4.0", "", { "dependencies": { "@nats-io/nats-core": "3.4.0", "@nats-io/nkeys": "2.0.3", "@nats-io/nuid": "3.0.0" } }, "sha1-a97KhtQ/pIYaOcYuSZY4CCUTlWA="],
+
+    "@synadia-ai/agents": ["@synadia-ai/agents@0.5.2", "", { "dependencies": { "@nats-io/nats-core": "^3.4.0", "@nats-io/services": "^3.4.0", "@nats-io/transport-node": "^3.4.0" } }, "sha512-7N8C/sBH5wIf0Q3boodDJEpG9dq4sBFLyiS8slLBU5fTrcU12ftHPRzfT+r3zcLYdaYKaMhdeYXEh+qxVomiDw=="],
+
+    "tweetnacl": ["tweetnacl@1.0.3", "", {}, "sha1-rAr3FoBFjYpjeNDQ0FCrFAfTVZY="],
+  }
+}
