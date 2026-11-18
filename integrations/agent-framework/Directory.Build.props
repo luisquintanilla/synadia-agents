@@ -1,0 +1,4 @@
+<Project>
+  <!-- Same conventions as the core host SDK this adapter builds on. -->
+  <Import Project="..\..\agent-sdk\dotnet\Directory.Build.props" />
+</Project>

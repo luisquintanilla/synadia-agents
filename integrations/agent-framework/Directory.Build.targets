@@ -1,0 +1,4 @@
+<Project>
+  <!-- Same packaging rules as the host SDK. -->
+  <Import Project="..\..\agent-sdk\dotnet\Directory.Build.targets" />
+</Project>

@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/deps/">
+    <Project Path="../../client-sdk/dotnet/src/Synadia.AI.Agents/Synadia.AI.Agents.csproj" />
+    <Project Path="../../agent-sdk/dotnet/src/Synadia.AI.Agents.Service/Synadia.AI.Agents.Service.csproj" />
+    <Project Path="../../agent-sdk/dotnet/src/Synadia.AI.Agents.Testing/Synadia.AI.Agents.Testing.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Synadia.AI.Agents.AgentFramework/Synadia.AI.Agents.AgentFramework.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Synadia.AI.Agents.AgentFramework.Tests/Synadia.AI.Agents.AgentFramework.Tests.csproj" />
+  </Folder>
+</Solution>
