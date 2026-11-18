@@ -13,6 +13,13 @@ describe("README", () => {
     expect(readme).not.toContain("--experimental-acp"); // gemini preset removed
   });
 
+  test("documents the copilot preset and its permission safeguards", () => {
+    expect(readme).toContain("copilot --acp");
+    expect(readme).toContain("COPILOT_HOME");
+    expect(readme).toContain("COPILOT_ALLOW_ALL");
+    expect(readme).toContain("SYNADIA_COPILOT_MODEL");
+  });
+
   test("documents the Antigravity custom-preset route honestly", () => {
     expect(readme).toContain("no native ACP mode yet");
     expect(readme).toContain("--agent custom --agent-id antigravity");

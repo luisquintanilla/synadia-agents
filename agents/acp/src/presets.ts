@@ -25,6 +25,17 @@ export interface AcpAgentPreset {
   readonly homeEnvVar?: string;
   /** Per-agent identity env var prefix (`SYNADIA_GROK`, ...). */
   readonly envPrefix: string;
+  /** CLI flag that selects the model (enables `--model` pass-through). */
+  readonly modelFlag?: string;
+  /** CLI flag that selects reasoning effort (enables `--reasoning-effort`). */
+  readonly effortFlag?: string;
+  /**
+   * Env vars removed from the spawned agent's environment because they would
+   * bypass the channel's `permission_policy` (e.g. an inherited auto-approve).
+   */
+  readonly scrubEnv?: readonly string[];
+  /** Example authenticated home shown in auth hints (e.g. `~/.grok`). */
+  readonly homeExample?: string;
   readonly description: string;
 }
 
@@ -37,7 +48,25 @@ export const ACP_PRESETS: readonly AcpAgentPreset[] = [
     args: ["agent", "stdio"],
     homeEnvVar: "GROK_HOME",
     envPrefix: "SYNADIA_GROK",
+    homeExample: "~/.grok",
     description: "Grok Build (xAI) — native ACP via `grok agent stdio`",
+  },
+  {
+    key: "copilot",
+    agentId: "copilot",
+    subjectToken: "copilot",
+    bin: "copilot",
+    // `--acp` defaults to stdio transport (public preview).
+    args: ["--acp"],
+    homeEnvVar: "COPILOT_HOME",
+    envPrefix: "SYNADIA_COPILOT",
+    modelFlag: "--model",
+    effortFlag: "--reasoning-effort",
+    // COPILOT_ALLOW_ALL auto-approves every tool, silently overriding the
+    // channel's permission policy.
+    scrubEnv: ["COPILOT_ALLOW_ALL"],
+    homeExample: "~/.copilot",
+    description: "GitHub Copilot CLI — native ACP via `copilot --acp` (public preview)",
   },
   // A `gemini` preset existed briefly pre-release; Gemini CLI was superseded
   // by Google Antigravity (`agy`), which has no native ACP mode yet — drive

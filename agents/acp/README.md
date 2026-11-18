@@ -1,7 +1,7 @@
 # ACP NATS Channel
 
 `@synadia-ai/acp-nats-channel` exposes **ACP-speaking coding agents** — Grok
-Build, Gemini CLI, and any other agent that implements the
+Build, GitHub Copilot CLI, and any other agent that implements the
 [Agent Client Protocol](https://agentclientprotocol.com) — through the
 [Synadia Agent Protocol for NATS](https://github.com/synadia-ai/synadia-agent-sdk-docs) v0.3.
 
@@ -26,7 +26,7 @@ terminators come from `@synadia-ai/agent-service`, exactly as in the
 - Package: `@synadia-ai/acp-nats-channel`
 - Binary: `acp-agent`
 - Prompt subject: `agents.prompt.<token>.<owner>.<session>` where `<token>`
-  comes from the preset (`grok`, `gemini`, or your custom token)
+  comes from the preset (`grok`, `copilot`, or your custom token)
 - Status subject: `agents.status.<token>.<owner>.<session>`
 - Heartbeat subject: `agents.hb.<token>.<owner>.<session>`
 
@@ -35,6 +35,7 @@ terminators come from `@synadia-ai/agent-service`, exactly as in the
 | Preset | `metadata.agent` | Subject token | Spawns | Home isolation |
 | --- | --- | --- | --- | --- |
 | `grok` (default) | `grok` | `grok` | `grok agent stdio` | `GROK_HOME` → ephemeral temp dir |
+| `copilot` | `copilot` | `copilot` | `copilot --acp` (+ `--model` / `--reasoning-effort`) | `COPILOT_HOME` → ephemeral temp dir; `COPILOT_ALLOW_ALL` never inherited |
 | `custom` | `--agent-id` | `--agent-id` (or `--subject-token`) | `--acp-bin` + `--acp-args` | — |
 
 Any agent on the [ACP agents list](https://agentclientprotocol.com/get-started/agents)
@@ -43,7 +44,51 @@ via `custom`; presets just bundle the spawn command and env-var conventions.
 
 The grok preset also ships as a pinned front-door package —
 [`agents/grok/`](../grok/) (`@synadia-ai/grok-nats-channel`, bin
-`grok-agent`) — with grok-specific setup and permission docs.
+`grok-agent`) — with grok-specific setup and permission docs. The copilot
+preset has no front-door package. GitHub Copilot's dedicated package,
+[`agents/copilot/`](../copilot/) (`@synadia-ai/copilot-nats-channel`), is
+built on the Copilot SDK instead. It provides a headless `serve` agent with
+`ask_user` relay, per-session model and effort, and resumable conversations,
+plus a Copilot CLI/App extension. That README compares it with this preset.
+
+### GitHub Copilot CLI (`copilot` preset)
+
+[Copilot CLI](https://docs.github.com/copilot/how-tos/copilot-cli) speaks ACP
+natively via `copilot --acp` (public preview; stdio by default). Authenticate
+once with `copilot login` (or export `COPILOT_GITHUB_TOKEN`, or configure BYOK
+via `COPILOT_PROVIDER_*`), then:
+
+```sh
+acp-agent start --agent copilot --mode managed \
+  --model claude-haiku-4.5 --reasoning-effort low --session demo
+# -> acp-agent (copilot, managed) listening on agents.prompt.copilot.<you>.demo
+```
+
+`--model` / `--reasoning-effort` (env `SYNADIA_COPILOT_MODEL` /
+`SYNADIA_COPILOT_REASONING_EFFORT`) are appended to the spawn args as
+Copilot's own `--model` / `--reasoning-effort` flags and advertised in the
+service metadata (`acp_model`, `acp_reasoning_effort`). Presets without such
+flags reject them; pass agent flags through `--acp-args` instead. Copilot
+validates both when the session is created, and the channel fails fast with
+Copilot's message. For example, `claude-haiku-4.5` rejects any
+`--reasoning-effort`.
+
+**Home and auth.** Managed Copilot runs with `COPILOT_HOME` pointed at the
+agent home. By default this is an ephemeral temp dir, so no MCP servers,
+custom agents, or saved "allow always" rules leak in. Copilot keeps its
+login in the OS credential store, so an ephemeral home is still
+authenticated on Windows (verified) and typically macOS. On hosts without
+a credential store, export `COPILOT_GITHUB_TOKEN`. `--agent-home ~/.copilot`
+reuses your own home, including its saved allow rules.
+
+**Permissions.** Copilot runs read-only tools without asking. File writes
+and shell commands raise `session/request_permission`, which the
+`--permission-policy` described below answers. `allow_always` is never
+chosen. The preset also strips `COPILOT_ALLOW_ALL` from Copilot's
+environment, because that variable approves every tool (and trusts the
+cwd) before the channel sees a request. A denied Copilot turn ends with
+`end_turn` rather than `cancelled`. Copilot-specific observations are in
+[`agents/copilot/NOTES-upstream.md`](../copilot/NOTES-upstream.md).
 
 ### Antigravity (`agy`) — via the custom preset
 
@@ -99,7 +144,8 @@ speaks ACP natively.
 - Bun 1.3+ for local development and smoke tests.
 - `nats-server` on `PATH` for the smoke tests (they start disposable loopback
   servers).
-- The agent binary for managed mode: [`grok`](https://x.ai/cli), or your
+- The agent binary for managed mode: [`grok`](https://x.ai/cli),
+  [`copilot`](https://docs.github.com/copilot/how-tos/copilot-cli), or your
   custom agent/adapter binary. Not required for `fake` mode or the
   deterministic smokes.
 
@@ -170,7 +216,7 @@ restarted (same crash model as the codex channel).
 
 ## Configuration
 
-Precedence: CLI flags > per-agent env (`SYNADIA_GROK_*`) > channel env
+Precedence: CLI flags > per-agent env (`SYNADIA_GROK_*`, `SYNADIA_COPILOT_*`) > channel env
 (`SYNADIA_ACP_*`) > fleet-wide env (`SYNADIA_OWNER` / `SYNADIA_NAME`) > TOML
 config file > derived defaults. Config file:
 `~/.config/synadia/acp-nats-channel.toml` (print a starter with
@@ -178,13 +224,15 @@ config file > derived defaults. Config file:
 
 | Variable | Meaning | Default |
 | --- | --- | --- |
-| `SYNADIA_ACP_AGENT` | Preset: `grok`, `custom` | `grok` |
-| `SYNADIA_GROK_OWNER`, `SYNADIA_ACP_OWNER`, `SYNADIA_OWNER` | Owner (4th subject token) | sanitized `$USER` |
+| `SYNADIA_ACP_AGENT` | Preset: `grok`, `copilot`, `custom` | `grok` |
+| `SYNADIA_GROK_OWNER`, `SYNADIA_ACP_OWNER`, `SYNADIA_OWNER` | Owner (4th subject token) | sanitized `$USER` (or `%USERNAME%`) |
 | `SYNADIA_GROK_SESSION`, `SYNADIA_ACP_SESSION`, `SYNADIA_NAME` | Session (5th subject token) | sanitized cwd basename |
 | `SYNADIA_ACP_MODE` | `fake` or `managed` | `fake` |
 | `SYNADIA_GROK_BIN`, `SYNADIA_ACP_BIN` | Agent binary override | preset (`grok`) |
 | `SYNADIA_GROK_ARGS`, `SYNADIA_ACP_ARGS` | Spawn args override (space-separated) | preset (`agent stdio`) |
-| `SYNADIA_GROK_HOME`, `SYNADIA_ACP_HOME` | Agent home dir (reuse auth) | ephemeral temp dir (grok) |
+| `SYNADIA_GROK_HOME`, `SYNADIA_ACP_HOME` | Agent home dir (reuse auth) | ephemeral temp dir (grok, copilot) |
+| `SYNADIA_COPILOT_MODEL`, `SYNADIA_ACP_MODEL` | Model, via the preset's model flag (copilot) | agent default |
+| `SYNADIA_COPILOT_REASONING_EFFORT`, `SYNADIA_ACP_REASONING_EFFORT` | Reasoning effort, via the preset's effort flag (copilot) | agent default |
 | `SYNADIA_ACP_CWD` | ACP session working directory | process cwd |
 | `SYNADIA_GROK_PERMISSION_POLICY`, `SYNADIA_ACP_PERMISSION_POLICY` | `reject`, `query`, `allow` | `reject` |
 | `NATS_URL` / `NATS_CONTEXT` / `NATS_CREDS` | NATS connection. A context carries its own auth, so `NATS_CREDS` applies only when no context is set. | `nats://127.0.0.1:4222` |
@@ -224,6 +272,13 @@ grok auto-approves internally and **no queries ever reach the caller**. For a
 bus-governed agent, use a dedicated home containing just the auth state and no
 `permission_mode` override.
 
+Copilot behaves the same way: read-only tools run without asking, while file
+writes and shell commands produce `session/request_permission` (options
+`allow_once` / `allow_always` / `reject_once`). The `copilot` preset strips an
+inherited `COPILOT_ALLOW_ALL` from the agent's environment, because it would
+approve every tool before the channel's policy is consulted. Allow rules
+persisted in a reused `--agent-home` still apply.
+
 ## Auth and home isolation (grok)
 
 Managed grok runs with `GROK_HOME` pointed at an **ephemeral temp directory**
@@ -239,6 +294,14 @@ unauthenticated, so `session/new` fails with an auth error until you either
 
 Custom-preset agents have no home isolation; they use their normal user
 configuration and auth.
+
+Copilot gets the same ephemeral `COPILOT_HOME` by default. Copilot keeps its
+login in the OS credential store when one is available, so on Windows (verified)
+and macOS the isolated home is typically still authenticated. Where it is
+not (e.g. Linux without a keyring), it is unauthenticated: export
+`COPILOT_GITHUB_TOKEN`, or pass `--agent-home ~/.copilot`. Reusing
+`~/.copilot` also loads your MCP servers, custom agents, and instructions, and
+adds the bus sessions to your session history.
 
 ## Protocol compliance and limitations
 

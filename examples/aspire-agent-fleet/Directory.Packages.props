@@ -1,0 +1,6 @@
+<Project>
+  <!-- Intentionally empty: versions live in each project; stops inheriting central package management from parent folders. -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+</Project>

@@ -12,6 +12,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optional signed host identity and independent signed-only prompt admission.
   Both reuse the one SDK connection bundle; existing identity-free operation
   remains the default.
+- `copilot` preset: GitHub Copilot CLI via `copilot --acp` (public preview),
+  with ephemeral `COPILOT_HOME` isolation by default and `SYNADIA_COPILOT_*`
+  per-agent env vars. An inherited `COPILOT_ALLOW_ALL` is stripped from the
+  agent environment so it cannot bypass the channel's permission policy.
+- Model / reasoning-effort pass-through (`--model`, `--reasoning-effort`;
+  `acp.model`, `acp.reasoning_effort`; `SYNADIA_<AGENT>_MODEL`,
+  `SYNADIA_<AGENT>_REASONING_EFFORT`). Each value is appended via the preset's
+  own CLI flag and advertised as `acp_model` / `acp_reasoning_effort` service
+  metadata. Presets without such a flag reject the setting.
+
+### Fixed
+
+- The default owner falls back to `USERNAME` when `USER` is unset (Windows),
+  instead of `unknown`.
+- The "agent-side prompt errors propagate" managed-runtime test no longer
+  times out under Bun 1.4. The runtime always rejected promptly; Bun 1.4's
+  `expect(...).toThrow` hung on the async-generator rejection.
 
 ## [0.1.0] - 2026-07-18
 

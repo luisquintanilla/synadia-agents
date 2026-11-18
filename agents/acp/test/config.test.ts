@@ -65,6 +65,12 @@ describe("config", () => {
     expect(fleetOnly.agent.session).toBe("fleet-session");
   });
 
+  test("derives the default owner from USERNAME when USER is unset (Windows)", () => {
+    const cfg = loadConfigFromSources({ ...base, env: { USERNAME: "Bob.Smith" } });
+    expect(cfg.agent.owner).toBe("bob-smith");
+    expect(loadConfigFromSources({ ...base, env: {} }).agent.owner).toBe("unknown");
+  });
+
   test("CLI overrides env, file, and defaults", () => {
     const file = `[nats]\nurl = "nats://file:4222"\n\n[agent]\nowner = "file-owner"\nsession = "file-session"\n\n[acp]\nmode = "managed"\npermission_policy = "allow"\n`;
     const cfg = loadConfigFromSources({
@@ -83,6 +89,45 @@ describe("config", () => {
     expect(cfg.acp.mode).toBe("fake");
     expect(cfg.acp.permissionPolicy).toBe("reject");
     expect(cfg.nats.url).toBe("nats://file:4222");
+  });
+
+  test("copilot preset resolves spawn, home, and per-agent env", () => {
+    const cfg = loadConfigFromSources({
+      ...base,
+      argv: ["start", "--agent", "copilot"],
+      env: { USER: "alice", SYNADIA_COPILOT_OWNER: "copilot-owner", SYNADIA_GROK_OWNER: "grok-owner" },
+    });
+    expect(cfg.acp.agentId).toBe("copilot");
+    expect(cfg.agent.subjectToken).toBe("copilot");
+    expect(cfg.acp.bin).toBe("copilot");
+    expect(cfg.acp.args).toEqual(["--acp"]);
+    expect(cfg.acp.homeEnvVar).toBe("COPILOT_HOME");
+    expect(cfg.acp.homeExample).toBe("~/.copilot");
+    expect(cfg.acp.scrubEnv).toEqual(["COPILOT_ALLOW_ALL"]);
+    expect(cfg.acp.permissionPolicy).toBe("reject");
+    expect(cfg.agent.owner).toBe("copilot-owner");
+  });
+
+  test("model and reasoning effort are appended via the preset flags", () => {
+    const cli = loadConfigFromSources({ ...base, argv: ["start", "--agent", "copilot", "--model", "claude-haiku-4.5", "--reasoning-effort", "low"] });
+    expect(cli.acp.args).toEqual(["--acp", "--model", "claude-haiku-4.5", "--reasoning-effort", "low"]);
+    expect(cli.acp.model).toBe("claude-haiku-4.5");
+    expect(cli.acp.reasoningEffort).toBe("low");
+    const env = loadConfigFromSources({
+      ...base,
+      argv: ["start", "--agent", "copilot"],
+      env: { USER: "alice", SYNADIA_COPILOT_MODEL: "gpt-5", SYNADIA_ACP_MODEL: "ignored", SYNADIA_ACP_REASONING_EFFORT: "high" },
+    });
+    expect(env.acp.args).toEqual(["--acp", "--model", "gpt-5", "--reasoning-effort", "high"]);
+    const file = loadConfigFromSources({ ...base, readFile: () => `[acp]\nagent = "copilot"\nmodel = "auto"\nreasoning_effort = ""\n` });
+    expect(file.acp.args).toEqual(["--acp", "--model", "auto"]);
+    expect(file.acp.reasoningEffort).toBeUndefined();
+  });
+
+  test("model pass-through is rejected for presets without a model flag", () => {
+    expect(() => loadConfigFromSources({ ...base, argv: ["start", "--model", "grok-4"] })).toThrow("preset grok has no model flag");
+    expect(() => loadConfigFromSources({ ...base, argv: ["start", "--agent", "custom", "--agent-id", "x", "--acp-bin", "x", "--reasoning-effort", "low"] })).toThrow("--acp-args");
+    expect(() => loadConfigFromSources({ ...base, argv: ["start", "--agent", "copilot", "--model", "a b"] })).toThrow("whitespace");
   });
 
   test("subject token override is validated, not rewritten", () => {

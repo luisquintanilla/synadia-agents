@@ -1,0 +1,14 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Runnable example: nothing here is packed or published. -->
+    <IsPackable>false</IsPackable>
+    <AspireVersion>13.6.5</AspireVersion>
+    <NatsNetVersion>3.3.2</NatsNetVersion>
+    <CommunityToolkitAspireVersion>13.6.1</CommunityToolkitAspireVersion>
+  </PropertyGroup>
+</Project>

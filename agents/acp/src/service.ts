@@ -37,6 +37,8 @@ export function buildAgentServiceOptions(input: BuildAgentServiceOptionsInput): 
       acp_preset: mapping.acp.preset,
       acp_mode: mapping.acp.mode,
       permission_policy: mapping.acp.permissionPolicy,
+      ...(mapping.acp.model !== undefined ? { acp_model: mapping.acp.model } : {}),
+      ...(mapping.acp.reasoningEffort !== undefined ? { acp_reasoning_effort: mapping.acp.reasoningEffort } : {}),
       ...input.extraMetadata,
     },
   };

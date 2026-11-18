@@ -19,7 +19,7 @@ export interface AgentIdentityConfig {
 
 export interface AcpRuntimeConfig {
   readonly mode: AcpMode;
-  /** Preset name this config was resolved from (`grok`, `gemini`, or `custom`). */
+  /** Preset name this config was resolved from (`grok`, `copilot`, or `custom`). */
   readonly preset: string;
   /** Canonical agent identifier advertised as `metadata.agent`. */
   readonly agentId: string;
@@ -35,6 +35,14 @@ export interface AcpRuntimeConfig {
   readonly homeEnvVar?: string;
   /** Explicit home directory (e.g. an already-authenticated `~/.grok`). */
   readonly agentHome?: string;
+  /** Example authenticated home for hints (preset-defined, e.g. `~/.copilot`). */
+  readonly homeExample?: string;
+  /** Env vars removed from the agent's environment (preset-defined). */
+  readonly scrubEnv?: readonly string[];
+  /** Model passed via the preset's model flag (already folded into `args`). */
+  readonly model?: string;
+  /** Reasoning effort passed via the preset's effort flag (already in `args`). */
+  readonly reasoningEffort?: string;
   /** Working directory for the ACP session. Absolute. */
   readonly cwd: string;
   readonly permissionPolicy: AcpPermissionPolicy;

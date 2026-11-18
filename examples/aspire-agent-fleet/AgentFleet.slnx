@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="AgentFleet.AppHost/AgentFleet.AppHost.csproj" />
+  <Project Path="AgentFleet.DotNetAgent/AgentFleet.DotNetAgent.csproj" />
+  <Project Path="AgentFleet.ServiceDefaults/AgentFleet.ServiceDefaults.csproj" />
+  <Folder Name="/integrations/">
+    <Project Path="../../integrations/aspire/src/Synadia.AI.Agents.Hosting.Aspire/Synadia.AI.Agents.Hosting.Aspire.csproj" />
+  </Folder>
+</Solution>

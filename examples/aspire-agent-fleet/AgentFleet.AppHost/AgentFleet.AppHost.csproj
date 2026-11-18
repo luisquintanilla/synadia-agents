@@ -1,0 +1,21 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.6.5">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AspireUseCliBundle>true</AspireUseCliBundle>
+    <UserSecretsId>synadia-agent-fleet-apphost</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Community Toolkit Ollama hosting integration: ollama container + model resources (Ollama:Mode=container). -->
+    <PackageReference Include="CommunityToolkit.Aspire.Hosting.Ollama" Version="$(CommunityToolkitAspireVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\integrations\aspire\src\Synadia.AI.Agents.Hosting.Aspire\Synadia.AI.Agents.Hosting.Aspire.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\AgentFleet.DotNetAgent\AgentFleet.DotNetAgent.csproj" />
+    <!-- Document-extraction agent. -->
+    <ProjectReference Include="..\..\dotnet-document-agent\src\DocumentExtraction.Host\DocumentExtraction.Host.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -165,7 +165,7 @@ channel's — the grok-specific vars:
 
 | Variable | Meaning | Default |
 | --- | --- | --- |
-| `SYNADIA_GROK_OWNER` | Owner (4th subject token) | sanitized `$USER` |
+| `SYNADIA_GROK_OWNER` | Owner (4th subject token) | sanitized `$USER` (or `%USERNAME%`) |
 | `SYNADIA_GROK_SESSION` | Session (5th subject token) | sanitized cwd basename |
 | `SYNADIA_GROK_HOME` | Agent home (see above) | ephemeral temp dir |
 | `SYNADIA_GROK_BIN`, `SYNADIA_GROK_ARGS` | Spawn override | `grok` / `agent stdio` |

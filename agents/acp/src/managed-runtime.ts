@@ -76,6 +76,7 @@ export class ManagedAcpRuntime implements AcpBridgeClient {
     if (acp.homeEnvVar !== undefined) {
       env[acp.homeEnvVar] = this.#ensureHome();
     }
+    for (const [key, value] of Object.entries(scrubbedEnv(acp.scrubEnv, process.env))) env[key] = value;
     const client = AcpAgentClient.spawn({
       command: this.#opts.command ?? acp.bin,
       args: this.#opts.args ?? acp.args,
@@ -91,7 +92,7 @@ export class ManagedAcpRuntime implements AcpBridgeClient {
       const stderr = client.stderrTail.trim();
       const hint = acp.homeEnvVar !== undefined && this.#ownsHome
         ? ` Hint: managed mode runs ${acp.bin} in an isolated ${acp.homeEnvVar}; if the agent requires authentication, ` +
-          `authenticate it once and pass --agent-home pointing at that home (e.g. ~/.grok).`
+          `authenticate it once and pass --agent-home pointing at that home (e.g. ${acp.homeExample ?? "~/.<agent>"}).`
         : "";
       await this.close();
       throw new Error(
@@ -171,6 +172,24 @@ export class ManagedAcpRuntime implements AcpBridgeClient {
     await prev;
     return release;
   }
+}
+
+/**
+ * Overrides that unset each `names` entry (matched case-insensitively, since
+ * Windows env keys are) when merged over `base` for the spawned agent.
+ */
+export function scrubbedEnv(
+  names: readonly string[] | undefined,
+  base: Record<string, string | undefined>,
+): Record<string, undefined> {
+  const out: Record<string, undefined> = {};
+  if (!names?.length) return out;
+  const wanted = new Set(names.map((n) => n.toUpperCase()));
+  for (const name of names) out[name] = undefined;
+  for (const key of Object.keys(base)) {
+    if (wanted.has(key.toUpperCase())) out[key] = undefined;
+  }
+  return out;
 }
 
 /**

@@ -1,0 +1,28 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Extraction (preview) -->
+    <PackageVersion Include="CommunityToolkit.DocumentExtraction.PdfPig" Version="1.0.0-preview" />
+    <PackageVersion Include="CommunityToolkit.DocumentExtraction.VisionLanguageModel" Version="1.0.0-preview" />
+    <PackageVersion Include="Microsoft.Extensions.DocumentExtraction" Version="11.0.0-preview.1.26560.3" />
+    <PackageVersion Include="Microsoft.Extensions.DocumentExtraction.Abstractions" Version="11.0.0-preview.1.26560.3" />
+    <PackageVersion Include="Microsoft.Extensions.Documents.Abstractions" Version="11.0.0-preview.1.26560.3" />
+    <!-- Ingestion / vector data -->
+    <PackageVersion Include="Microsoft.Extensions.DataIngestion" Version="11.0.0-preview.1.26560.3" />
+    <PackageVersion Include="Microsoft.Extensions.VectorData.Abstractions" Version="11.0.0" />
+    <PackageVersion Include="CommunityToolkit.VectorData.InMemory" Version="1.0.1" />
+    <PackageVersion Include="Microsoft.ML.Tokenizers" Version="3.0.0" />
+    <PackageVersion Include="Microsoft.ML.Tokenizers.Data.O200kBase" Version="3.0.0" />
+    <!-- AI -->
+    <PackageVersion Include="Microsoft.Extensions.AI" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.AI.Abstractions" Version="11.0.0" />
+    <PackageVersion Include="OllamaSharp" Version="5.5.2" />
+    <!-- Fixture generation -->
+    <PackageVersion Include="PdfPig" Version="0.1.16" />
+    <PackageVersion Include="SkiaSharp" Version="4.156.1" />
+    <!-- Tests -->
+    <PackageVersion Include="xunit.v3" Version="4.0.3" />
+  </ItemGroup>
+</Project>

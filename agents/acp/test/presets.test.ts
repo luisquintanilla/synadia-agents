@@ -12,6 +12,19 @@ describe("presets", () => {
     expect(grok?.envPrefix).toBe("SYNADIA_GROK");
   });
 
+  test("copilot preset spawns `copilot --acp` with COPILOT_HOME isolation", () => {
+    const copilot = resolvePreset("copilot");
+    expect(copilot?.agentId).toBe("copilot");
+    expect(copilot?.subjectToken).toBe("copilot");
+    expect(copilot?.bin).toBe("copilot");
+    expect(copilot?.args).toEqual(["--acp"]);
+    expect(copilot?.homeEnvVar).toBe("COPILOT_HOME");
+    expect(copilot?.envPrefix).toBe("SYNADIA_COPILOT");
+    expect(copilot?.modelFlag).toBe("--model");
+    expect(copilot?.effortFlag).toBe("--reasoning-effort");
+    expect(copilot?.scrubEnv).toContain("COPILOT_ALLOW_ALL");
+  });
+
   test("preset listing includes custom", () => {
     expect(resolvePreset("custom")).toBeUndefined();
     expect(presetKeys()).toContain("custom");

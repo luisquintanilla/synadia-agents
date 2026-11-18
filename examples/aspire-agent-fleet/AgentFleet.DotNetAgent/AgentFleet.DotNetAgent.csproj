@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>AgentFleet.DotNetAgent</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Aspire client integration: INatsConnection from ConnectionStrings__nats, plus NATS.Net tracing + health check. -->
+    <PackageReference Include="Aspire.NATS.Net" Version="$(AspireVersion)" />
+    <!-- Aspire.NATS.Net only floors NATS.Net at 2.x; pin the 3.x line the Synadia .NET SDK is built against. -->
+    <PackageReference Include="NATS.Net" Version="$(NatsNetVersion)" />
+    <PackageReference Include="Microsoft.Extensions.AI" Version="11.0.0" />
+    <!-- Community Toolkit OllamaSharp client integration: IOllamaApiClient / IChatClient from ConnectionStrings__chat. -->
+    <PackageReference Include="CommunityToolkit.Aspire.OllamaSharp" Version="$(CommunityToolkitAspireVersion)" />
+    <PackageReference Include="OllamaSharp" Version="5.5.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\agent-sdk\dotnet\src\Synadia.AI.Agents.Service\Synadia.AI.Agents.Service.csproj" />
+    <ProjectReference Include="..\AgentFleet.ServiceDefaults\AgentFleet.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+</Project>

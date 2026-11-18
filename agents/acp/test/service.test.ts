@@ -37,6 +37,14 @@ describe("service construction", () => {
     });
   });
 
+  test("advertises model and reasoning effort when configured", () => {
+    const base = cfg();
+    const config = { ...base, acp: { ...base.acp, preset: "copilot", agentId: "copilot", model: "claude-haiku-4.5", reasoningEffort: "low" } };
+    const opts = buildAgentServiceOptions({ nc: {} as never, config, version: "0.1.0" });
+    expect(opts.agent).toBe("copilot");
+    expect(opts.extraMetadata).toMatchObject({ acp_preset: "copilot", acp_model: "claude-haiku-4.5", acp_reasoning_effort: "low" });
+  });
+
   test("uses only the connection-bundle signer when signed mode is enabled", () => {
     const signer = {} as never;
     const base = cfg();

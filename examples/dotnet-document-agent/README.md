@@ -1,0 +1,151 @@
+# .NET document extraction agent
+
+A **.NET agent on the Synadia Agent Protocol for NATS** that turns attached documents
+into markdown and answers questions about them. It is built on the .NET document stack:
+
+| Layer | Package | Role here |
+| --- | --- | --- |
+| Extraction | `Microsoft.Extensions.DocumentExtraction` + CommunityToolkit providers (`PdfPig`, `VisionLanguageModel`) | PDF / image → provider-neutral `ExtractionDocument` |
+| Ingestion (MEDI) | `Microsoft.Extensions.DataIngestion` | `ExtractionDocument` → `IngestionDocument` → header-aware chunks |
+| Vector data (MEVD) | `Microsoft.Extensions.VectorData.Abstractions` + `CommunityToolkit.VectorData.InMemory` | chunk embeddings + similarity search |
+| AI (MEAI) | `Microsoft.Extensions.AI` + OllamaSharp | vision model, embeddings, answer model, `search_documents` tool |
+
+> **Status:** working end to end. The core, harness and tests run without NATS. `DocumentExtraction.Host`
+> serves the agent over NATS through the in-repo .NET SDK (`ServeChatClient`). TypeScript, Python and .NET
+> callers send it a PDF and get markdown back (see [Serve it over NATS](#serve-it-over-nats)).
+> [`FINDINGS.md`](FINDINGS.md) covers the spike results, the `max_payload` limits, a JetStream Object Store
+> proposal for large documents, and transcripts from the callers.
+> Standalone example: every project is `IsPackable=false` and the callers are private, so nothing here is
+> published to NuGet, npm or PyPI. Run it from a clone.
+
+## Two modes, one handler
+
+```mermaid
+flowchart LR
+    R["DocumentAgentRequest<br/>prompt + DataContent[]"] --> M{mode}
+    M -->|"files, no question<br/>or /extract"| X[DocumentExtractorRouter]
+    X -->|PDF| P["PdfLayoutExtractionClient<br/>(PdfPig + Docstrum + tables)"]
+    X -->|image| V["VisionLanguageModel<br/>over any IChatClient"]
+    X -->|text/md/csv| T[PlainTextExtractionClient]
+    P & V & T --> MD["ExtractionMarkdown<br/>→ markdown per page"]
+    M -->|"question<br/>or /ask"| KB[DocumentKnowledgeBase]
+    KB --> B["ExtractionToIngestion<br/>(bridge)"] --> C["HeaderChunker"] --> W["VectorStoreWriter<br/>InMemory + embeddings"]
+    KB --> A["answer IChatClient<br/>+ search_documents tool"]
+```
+
+- **Extract** — each attachment is extracted and streamed back as markdown (headings, paragraphs, GFM
+  tables), one `<!-- page N -->` block per page, with `"name: page 2/5"` status updates.
+- **Ask (docs/RAG)** — attachments are indexed (extraction → MEDI chunking → `embeddinggemma` → in-memory
+  vector store). Top passages are pre-fetched into the prompt, and the chat model can call
+  `search_documents` for follow-ups. The index persists across requests, so later questions need no
+  attachments.
+
+Mode is inferred (attachments with no question, or with an "extract/convert/markdown" verb → Extract;
+otherwise Ask) or forced with a leading command: `/extract`, `/ask`, `/ingest`, `/docs`, `/reset`, `/help`.
+
+## The seam
+
+```csharp
+public interface IDocumentAgentHandler
+{
+    IAsyncEnumerable<ChatResponseUpdate> HandleAsync(DocumentAgentRequest request, CancellationToken ct = default);
+}
+```
+
+- Input is `DocumentAgentRequest(prompt, IReadOnlyList<DataContent> attachments)`.
+  `DocumentAgentRequest.FromMessage(chatMessage)` builds it from the SDK's `PromptContext.ToChatMessage()`
+  (attachments arrive as `DataContent` with `Name` = filename).
+- Output is a plain MEAI update stream. Text updates are `response` chunks. Progress travels **in-band** as
+  content-less updates tagged `AdditionalProperties["synadia.status"]`; `DocumentAgentStatus.TryGet(update, …)`
+  lets a host map them to protocol `status` chunks.
+- `DocumentAgentChatClient` adapts the handler to `IChatClient`, so the NATS host is a one-liner over
+  the SDK's `ServeChatClient` (see `DocumentAgentHosting.Create`).
+
+## Run it
+
+Prereqs: .NET 10 SDK, and for the model-backed parts a local [Ollama](https://ollama.com) with `ollama pull qwen3.5:4b` and `ollama pull embeddinggemma`.
+
+```powershell
+cd examples/dotnet-document-agent
+dotnet test --solution DocumentAgent.slnx   # 39 tests; Ollama tests skip without Ollama, NATS tests without nats-server
+dotnet run --project src/DocumentExtraction.Harness -- demo
+```
+
+CI builds it and runs the tests with `nats-server` installed and no Ollama, so the Ollama tests skip.
+
+Harness commands (`document-agent` is the harness executable):
+
+| Command | What it does |
+| --- | --- |
+| `demo` (default) | PDF extract → image extract (VLM) → oversize rejection → RAG over all three → follow-up → `/docs` |
+| `extract <file>...` | Markdown for each file |
+| `ask "<question>" <file>...` | Index the files and answer |
+| `gen-fixtures [dir]` | Regenerate the sample PDF / PNG / markdown in `fixtures/` |
+
+Options: `--ollama <url>` (or `OLLAMA_URL`), `--chat-model`, `--embed-model`, `--no-vision` (PDF/text
+only, no model needed for extraction), `--think` (let qwen3.5 reason; slower).
+
+The fixtures are generated by `Fixtures.cs` (PdfPig writer + SkiaSharp), so they are license-clean.
+
+## Serve it over NATS
+
+```powershell
+# terminal 1: the agent. --embedded-nats starts a throw-away nats-server (on PATH) and prints NATS_URL;
+# or use --nats <url> / $env:NATS_URL to join an existing server.
+dotnet run --project src/DocumentExtraction.Host -- --embedded-nats
+#   NATS_URL=nats://127.0.0.1:58002
+#   listening on agents.prompt.docs.<you>.main (max_payload=1MB, attachments up to 762 KB; vision=qwen3.5:4b, embeddings=embeddinggemma)
+
+# terminal 2: any protocol client
+$env:NATS_URL = "nats://127.0.0.1:58002"
+cd callers/ts; bun install
+bun run extract-pdf.ts                                            # published @synadia-ai/agents (npm)
+bun run extract-pdf.ts ../../fixtures/invoice-1042.png             # image → vision model
+bun run extract-pdf.ts ../../fixtures/fabrikam-q3-report.pdf "What was North revenue?"
+cd ../python; uv run extract_pdf.py                               # published synadia-ai-agents (PyPI)
+```
+
+Both callers read `NATS_URL` and accept credentialed URLs such as Aspire's `nats://user:pass@host`. They split
+the user and password out themselves, because nats.js rejects credentials embedded in a server URL.
+
+The .NET caller path (`AgentsClient.DiscoverAsync` → `agent.AsIChatClient()` → a user `ChatMessage` with a
+PDF `DataContent`) is covered by `tests/DocumentExtraction.Host.Tests`, which starts its own nats-server.
+
+| Host option | Meaning |
+| --- | --- |
+| `--nats <url>` / `NATS_URL` | server to join (default `nats://127.0.0.1:4222`); `nats://user:pass@host` works, and the printed URL masks the password |
+| `--embedded-nats` | start a private nats-server on a random port (needs `nats-server` on PATH) |
+| `--owner <o>` / `--name <n>` | subject tokens: `agents.prompt.docs.<owner>.<name>` (defaults: user name, `main`) |
+| `--extract-only` | PDFs and text only, no models; questions are declined |
+| `--ollama <url>` / `OLLAMA_URL` | Ollama endpoint (default `http://localhost:11434`) |
+| `--chat-model <m>` / `--embed-model <m>` | defaults `qwen3.5:4b` (vision + answers) / `embeddinggemma` |
+| `--no-vision`, `--think` | as for the harness |
+
+Protocol notes:
+
+- The agent registers as `agent=docs`. Its service metadata advertises `document_formats`,
+  `document_modes` and `max_attachment_bytes`.
+- Every prompt must contain text (§5.1 rejects empty prompts). To extract, send the files with `/extract`
+  or a phrase like "convert to markdown". Any other text is treated as a question.
+- Status updates (`extracting …`, `name: page 1/2`, `indexing …`, `searching documents: …`, `answering`)
+  become protocol `status` chunks, and markdown becomes `response` chunks.
+- The host runs `ServeChatClient` with `KeepHistory = false`. The agent keeps its own state (the document
+  index), and storing chat history would send every earlier attachment's bytes back through the model.
+- Attachments that can't fit in one NATS message are refused by the caller SDK (`PayloadTooLargeError` /
+  `PayloadTooLargeException`) before anything is sent. Files that fit on the wire but are over the agent's
+  limit get a markdown ⚠️ note instead.
+
+## Layout
+
+```
+src/DocumentExtraction.Core/      the agent (no NATS dependency)
+src/DocumentExtraction.Harness/   console harness + fixture generator
+src/DocumentExtraction.Host/      NATS host (in-repo .NET SDK: ServeChatClient)
+tests/DocumentExtraction.Core.Tests/  xunit v3 (Microsoft.Testing.Platform)
+tests/DocumentExtraction.Host.Tests/  end to end over a real nats-server with the .NET client's AsIChatClient
+callers/ts, callers/python        TypeScript / Python callers using the published SDKs
+fixtures/                         generated sample files
+```
+
+The folder isolates itself from parent MSBuild/NuGet settings (`Directory.Build.*`, `global.json`,
+central package versions in `Directory.Packages.props`) so it builds the same anywhere in a checkout.

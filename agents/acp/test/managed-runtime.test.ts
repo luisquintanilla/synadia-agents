@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ManagedAcpRuntime } from "../src/managed-runtime.js";
+import { ManagedAcpRuntime, scrubbedEnv } from "../src/managed-runtime.js";
 import type { AcpChannelConfig } from "../src/config.js";
 
 function config(overrides: Partial<AcpChannelConfig["acp"]> = {}): AcpChannelConfig {
@@ -126,15 +127,33 @@ describe("ManagedAcpRuntime", () => {
     }
   });
 
+  test("scrubbed env vars never reach the spawned agent (case-insensitive)", () => {
+    const base = { ...process.env, COPILOT_ALLOW_ALL: "true", copilot_allow_all: "1", KEEP_ME: "yes" };
+    const overrides = scrubbedEnv(["COPILOT_ALLOW_ALL"], base);
+    const child = spawnSync("bun", ["-e", "console.log(JSON.stringify(Object.keys(process.env).filter((k) => /allow_all|keep_me/i.test(k))))"], {
+      env: { ...base, ...overrides },
+      encoding: "utf8",
+    });
+    expect(JSON.parse(child.stdout.trim())).toEqual(["KEEP_ME"]);
+    expect(scrubbedEnv(undefined, base)).toEqual({});
+  });
+
   test("agent-side prompt errors propagate for handler 500 coverage", async () => {
     const runtime = new ManagedAcpRuntime({ config: config(), ...fixture });
     try {
       await runtime.start();
-      await expect(async () => {
+      // Explicit try/catch: bun 1.4's `expect(...).rejects/toThrow` hangs on
+      // this async-generator rejection even though the runtime rejects promptly.
+      let error: unknown;
+      try {
         for await (const _event of runtime.prompt({ prompt: "explode", publicSession: "managed", permissionPolicy: "reject" })) {
           // drain
         }
-      }).toThrow("fake ACP agent exploded");
+      } catch (err) {
+        error = err;
+      }
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toContain("fake ACP agent exploded");
     } finally {
       await runtime.close();
     }

@@ -1,0 +1,63 @@
+#nullable enable
+const Synadia.AI.Agents.AgentFramework.NatsAIAgent.QueryFunctionName = "nats_agent_query" -> string!
+override Synadia.AI.Agents.AgentFramework.NatsAIAgent.Description.get -> string?
+override Synadia.AI.Agents.AgentFramework.NatsAIAgent.GetService(System.Type! serviceType, object? serviceKey = null) -> object?
+override Synadia.AI.Agents.AgentFramework.NatsAIAgent.Name.get -> string?
+static Synadia.AI.Agents.AgentFramework.AgentFrameworkAgentExtensions.AsAIAgent(this Synadia.AI.Agents.Agent! agent, Synadia.AI.Agents.AgentFramework.NatsAIAgentOptions? options = null) -> Synadia.AI.Agents.AgentFramework.NatsAIAgent!
+static Synadia.AI.Agents.AgentFramework.AIAgentServeExtensions.ServeAIAgent(this Synadia.AI.Agents.Service.AgentService! service, Microsoft.Agents.AI.AIAgent! agent, Synadia.AI.Agents.AgentFramework.AIAgentServeOptions? options = null) -> Synadia.AI.Agents.Service.AgentService!
+static Synadia.AI.Agents.AgentFramework.NatsAgentServerServiceCollectionExtensions.AddNatsAgentServer(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! agentName, System.Func<System.IServiceProvider!, Synadia.AI.Agents.Service.AgentServiceOptions!>! serviceOptions, Synadia.AI.Agents.AgentFramework.AIAgentServeOptions? serveOptions = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Synadia.AI.Agents.AgentFramework.NatsAgentServerServiceCollectionExtensions.AddNatsAgentServer(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Func<System.IServiceProvider!, Synadia.AI.Agents.Service.AgentServiceOptions!>! serviceOptions, System.Func<System.IServiceProvider!, Microsoft.Agents.AI.AIAgent!>! agent, Synadia.AI.Agents.AgentFramework.AIAgentServeOptions? serveOptions = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Synadia.AI.Agents.AgentFramework.AgentFrameworkAgentExtensions
+Synadia.AI.Agents.AgentFramework.AIAgentServeExtensions
+Synadia.AI.Agents.AgentFramework.AIAgentServeOptions
+Synadia.AI.Agents.AgentFramework.AIAgentServeOptions.AIAgentServeOptions() -> void
+Synadia.AI.Agents.AgentFramework.AIAgentServeOptions.Approval.get -> Synadia.AI.Agents.Service.ToolApprovalOptions?
+Synadia.AI.Agents.AgentFramework.AIAgentServeOptions.Approval.init -> void
+Synadia.AI.Agents.AgentFramework.AIAgentServeOptions.ConversationKey.get -> System.Func<Synadia.AI.Agents.Service.PromptContext!, string!>?
+Synadia.AI.Agents.AgentFramework.AIAgentServeOptions.ConversationKey.init -> void
+Synadia.AI.Agents.AgentFramework.AIAgentServeOptions.IncludeReasoning.get -> bool
+Synadia.AI.Agents.AgentFramework.AIAgentServeOptions.IncludeReasoning.init -> void
+Synadia.AI.Agents.AgentFramework.AIAgentServeOptions.MaxInputRounds.get -> int
+Synadia.AI.Agents.AgentFramework.AIAgentServeOptions.MaxInputRounds.init -> void
+Synadia.AI.Agents.AgentFramework.AIAgentServeOptions.OnRun.get -> System.Func<Synadia.AI.Agents.AgentFramework.ServedRun!, System.IDisposable?>?
+Synadia.AI.Agents.AgentFramework.AIAgentServeOptions.OnRun.init -> void
+Synadia.AI.Agents.AgentFramework.AIAgentServeOptions.QueryTimeout.get -> System.TimeSpan?
+Synadia.AI.Agents.AgentFramework.AIAgentServeOptions.QueryTimeout.init -> void
+Synadia.AI.Agents.AgentFramework.AIAgentServeOptions.RunOptions.get -> Microsoft.Agents.AI.AgentRunOptions?
+Synadia.AI.Agents.AgentFramework.AIAgentServeOptions.RunOptions.init -> void
+Synadia.AI.Agents.AgentFramework.AIAgentServeOptions.SessionStore.get -> Microsoft.Agents.AI.AgentSessionStore?
+Synadia.AI.Agents.AgentFramework.AIAgentServeOptions.SessionStore.init -> void
+Synadia.AI.Agents.AgentFramework.NatsAgentServerServiceCollectionExtensions
+Synadia.AI.Agents.AgentFramework.NatsAgentSession
+Synadia.AI.Agents.AgentFramework.NatsAgentSession.CancelPendingQueryAsync() -> System.Threading.Tasks.ValueTask
+Synadia.AI.Agents.AgentFramework.NatsAgentSession.PendingQuery.get -> Synadia.AI.Agents.AgentQueryContent?
+Synadia.AI.Agents.AgentFramework.NatsAgentSession.SessionId.get -> string!
+Synadia.AI.Agents.AgentFramework.NatsAIAgent
+Synadia.AI.Agents.AgentFramework.NatsAIAgent.NatsAIAgent(Synadia.AI.Agents.Agent! agent, Synadia.AI.Agents.AgentFramework.NatsAIAgentOptions? options = null) -> void
+Synadia.AI.Agents.AgentFramework.NatsAIAgent.RemoteAgent.get -> Synadia.AI.Agents.Agent!
+Synadia.AI.Agents.AgentFramework.NatsAIAgentOptions
+Synadia.AI.Agents.AgentFramework.NatsAIAgentOptions.Description.get -> string?
+Synadia.AI.Agents.AgentFramework.NatsAIAgentOptions.Description.set -> void
+Synadia.AI.Agents.AgentFramework.NatsAIAgentOptions.Id.get -> string?
+Synadia.AI.Agents.AgentFramework.NatsAIAgentOptions.Id.set -> void
+Synadia.AI.Agents.AgentFramework.NatsAIAgentOptions.IncludeStatus.get -> bool
+Synadia.AI.Agents.AgentFramework.NatsAIAgentOptions.IncludeStatus.set -> void
+Synadia.AI.Agents.AgentFramework.NatsAIAgentOptions.Name.get -> string?
+Synadia.AI.Agents.AgentFramework.NatsAIAgentOptions.Name.set -> void
+Synadia.AI.Agents.AgentFramework.NatsAIAgentOptions.NatsAIAgentOptions() -> void
+Synadia.AI.Agents.AgentFramework.NatsAIAgentOptions.PromptOptions.get -> Synadia.AI.Agents.PromptOptions?
+Synadia.AI.Agents.AgentFramework.NatsAIAgentOptions.PromptOptions.set -> void
+Synadia.AI.Agents.AgentFramework.NatsAIAgentOptions.QueryHandler.get -> System.Func<Synadia.AI.Agents.AgentQueryContent!, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<string?>>?
+Synadia.AI.Agents.AgentFramework.NatsAIAgentOptions.QueryHandler.set -> void
+Synadia.AI.Agents.AgentFramework.NatsAIAgentOptions.QueryMode.get -> Synadia.AI.Agents.AgentFramework.NatsQueryMode
+Synadia.AI.Agents.AgentFramework.NatsAIAgentOptions.QueryMode.set -> void
+Synadia.AI.Agents.AgentFramework.NatsQueryMode
+Synadia.AI.Agents.AgentFramework.NatsQueryMode.FunctionCall = 1 -> Synadia.AI.Agents.AgentFramework.NatsQueryMode
+Synadia.AI.Agents.AgentFramework.NatsQueryMode.InputRequest = 0 -> Synadia.AI.Agents.AgentFramework.NatsQueryMode
+Synadia.AI.Agents.AgentFramework.NatsQueryMode.ToolApproval = 2 -> Synadia.AI.Agents.AgentFramework.NatsQueryMode
+Synadia.AI.Agents.AgentFramework.ServedRun
+Synadia.AI.Agents.AgentFramework.ServedRun.AskAsync(string! prompt, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Synadia.AI.Agents.PromptEnvelope?>!
+Synadia.AI.Agents.AgentFramework.ServedRun.CancellationToken.get -> System.Threading.CancellationToken
+Synadia.AI.Agents.AgentFramework.ServedRun.Context.get -> Synadia.AI.Agents.Service.PromptContext!
+Synadia.AI.Agents.AgentFramework.ServedRun.Session.get -> Microsoft.Agents.AI.AgentSession!
+Synadia.AI.Agents.AgentFramework.ServedRun.Stream.get -> Synadia.AI.Agents.Service.PromptStream!

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
-import { resolvePreset, presetKeys, type AcpAgentPreset } from "./presets.js";
+import { ACP_PRESETS, resolvePreset, presetKeys, type AcpAgentPreset } from "./presets.js";
 import { requireSubjectToken, sanitizeDerivedSubjectToken } from "./subject.js";
 import type {
   AcpChannelConfig,
@@ -41,6 +41,8 @@ export interface ParsedArgs {
   readonly acpArgs?: string;
   readonly agentHome?: string;
   readonly acpCwd?: string;
+  readonly model?: string;
+  readonly reasoningEffort?: string;
   readonly permissionPolicy?: AcpPermissionPolicy;
   readonly heartbeatIntervalS?: number;
   readonly keepaliveIntervalS?: number;
@@ -74,6 +76,8 @@ const flagMap: Record<string, keyof Omit<ParsedArgs, "command">> = {
   "--acp-args": "acpArgs",
   "--agent-home": "agentHome",
   "--cwd": "acpCwd",
+  "--model": "model",
+  "--reasoning-effort": "reasoningEffort",
   "--permission-policy": "permissionPolicy",
   "--heartbeat-interval-s": "heartbeatIntervalS",
   "--keepalive-interval-s": "keepaliveIntervalS",
@@ -172,7 +176,7 @@ export function loadConfigFromSources(sources: LoadConfigSources = {}): AcpChann
   // Identity precedence (SYNADIA_* convention shared across agents/*):
   // CLI > per-agent env > channel env (SYNADIA_ACP_*) > fleet-wide env > file > derived.
   const owner = requireSubjectToken(
-    get(args.owner, perAgent("OWNER"), env.SYNADIA_ACP_OWNER, env.SYNADIA_OWNER, agentSection.owner, sanitizeDerivedSubjectToken(env.USER ?? "unknown") || "unknown")!,
+    get(args.owner, perAgent("OWNER"), env.SYNADIA_ACP_OWNER, env.SYNADIA_OWNER, agentSection.owner, sanitizeDerivedSubjectToken(env.USER ?? env.USERNAME ?? "unknown") || "unknown")!,
     "agent.owner",
   );
   const session = requireSubjectToken(
@@ -206,14 +210,30 @@ export function loadConfigFromSources(sources: LoadConfigSources = {}): AcpChann
   const bin = get(args.acpBin, perAgent("BIN"), env.SYNADIA_ACP_BIN, acpSection.bin, preset?.bin)
     ?? missing("custom agent requires --acp-bin (binary to spawn in ACP stdio mode)");
   const rawArgs = get(args.acpArgs, perAgent("ARGS"), env.SYNADIA_ACP_ARGS, acpSection.args);
-  const acpArgs: readonly string[] = rawArgs !== undefined
+  const baseArgs: readonly string[] = rawArgs !== undefined
     ? rawArgs.split(/\s+/).filter(Boolean)
     : preset?.args ?? [];
+
+  // Model / effort pass-through: appended as `<flag> <value>` only for
+  // presets that declare the flag; custom agents use --acp-args instead.
+  const model = passThrough(
+    get(args.model, perAgent("MODEL"), env.SYNADIA_ACP_MODEL, acpSection.model),
+    preset?.modelFlag, presetKey, "acp.model", "model",
+  );
+  const reasoningEffort = passThrough(
+    get(args.reasoningEffort, perAgent("REASONING_EFFORT"), env.SYNADIA_ACP_REASONING_EFFORT, acpSection.reasoning_effort),
+    preset?.effortFlag, presetKey, "acp.reasoning_effort", "reasoning effort",
+  );
+  const acpArgs: readonly string[] = [
+    ...baseArgs,
+    ...(model !== undefined ? [preset!.modelFlag!, model] : []),
+    ...(reasoningEffort !== undefined ? [preset!.effortFlag!, reasoningEffort] : []),
+  ];
 
   const agentHome = get(args.agentHome, perAgent("HOME"), env.SYNADIA_ACP_HOME, acpSection.agent_home);
   if (agentHome !== undefined && preset?.homeEnvVar === undefined) {
     throw new Error(
-      `acp.agent_home requires a preset with a home env var (currently: grok via GROK_HOME); ` +
+      `acp.agent_home requires a preset with a home env var (currently: ${homePresetList()}); ` +
       `for other agents point the agent at its home through your own environment`,
     );
   }
@@ -227,6 +247,10 @@ export function loadConfigFromSources(sources: LoadConfigSources = {}): AcpChann
     args: acpArgs,
     ...(preset?.homeEnvVar !== undefined ? { homeEnvVar: preset.homeEnvVar } : {}),
     ...(agentHome !== undefined ? { agentHome } : {}),
+    ...(preset?.homeExample !== undefined ? { homeExample: preset.homeExample } : {}),
+    ...(preset?.scrubEnv !== undefined ? { scrubEnv: preset.scrubEnv } : {}),
+    ...(model !== undefined ? { model } : {}),
+    ...(reasoningEffort !== undefined ? { reasoningEffort } : {}),
     cwd: resolve(get(args.acpCwd, env.SYNADIA_ACP_CWD, acpSection.cwd) ?? cwd),
     permissionPolicy: parsePermissionPolicy(
       get(args.permissionPolicy, perAgent("PERMISSION_POLICY"), env.SYNADIA_ACP_PERMISSION_POLICY, acpSection.permission_policy, "reject")!,
@@ -248,6 +272,25 @@ export function loadConfigFromSources(sources: LoadConfigSources = {}): AcpChann
 
 function missing(message: string): never {
   throw new Error(message);
+}
+
+function passThrough(
+  value: string | undefined,
+  flag: string | undefined,
+  presetKey: string,
+  field: string,
+  label: string,
+): string | undefined {
+  if (value === undefined) return undefined;
+  if (flag === undefined) {
+    throw new Error(`${field}: preset ${presetKey} has no ${label} flag; pass it via --acp-args instead`);
+  }
+  if (/\s/.test(value)) throw new Error(`${field} must not contain whitespace`);
+  return value;
+}
+
+function homePresetList(): string {
+  return ACP_PRESETS.filter((p) => p.homeEnvVar !== undefined).map((p) => `${p.key} via ${p.homeEnvVar}`).join(", ");
 }
 
 function parsePositiveNumber(value: string, field: string): number {
@@ -302,14 +345,17 @@ keepalive_interval_s = 30
 min_sender_trust = "any"
 
 [acp]
-# Preset: grok or custom (custom requires agent_id + bin).
+# Preset: grok, copilot, or custom (custom requires agent_id + bin).
 agent = "grok"
 # Managed spawns an adapter-owned ACP agent subprocess; fake is for protocol smoke tests.
 mode = "managed"
 bin = ""
 args = ""
 agent_id = ""
-# Point at an already-authenticated agent home (e.g. ~/.grok) to reuse auth.
+# Model / reasoning effort pass-through (presets with a model flag, e.g. copilot).
+model = ""
+reasoning_effort = ""
+# Point at an already-authenticated agent home (e.g. ~/.grok, ~/.copilot) to reuse auth.
 # Leave empty for an ephemeral isolated home (removed on shutdown).
 agent_home = ""
 # Working directory for the ACP session. Defaults to the process cwd.
@@ -343,12 +389,16 @@ Options:
   --acp-args "ARGS..."      (space-separated, e.g. "agent stdio")
   --agent-home PATH         (reuse an authenticated agent home, e.g. ~/.grok)
   --cwd PATH                (working directory for the ACP session)
+  --model ID                (presets with a model flag, e.g. copilot)
+  --reasoning-effort LEVEL  (presets with an effort flag, e.g. copilot)
   --permission-policy reject|query|allow
   --heartbeat-interval-s SECONDS
   --keepalive-interval-s SECONDS
 
 Presets spawn: grok -> \`grok agent stdio\` (GROK_HOME isolated per run unless
---agent-home is set). Use --agent custom with --agent-id/--acp-bin for any
+--agent-home is set); copilot -> \`copilot --acp\` (COPILOT_HOME isolated per
+run unless --agent-home is set; COPILOT_ALLOW_ALL is never inherited).
+Use --agent custom with --agent-id/--acp-bin for any
 other ACP-speaking agent or adapter (e.g. Antigravity via an ACP adapter).
 `;
 }

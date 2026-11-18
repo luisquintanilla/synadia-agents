@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Synadia.AI.Agents.Hosting.Aspire</RootNamespace>
+    <Description>Aspire hosting integration for the Synadia Agent Protocol for NATS (experimental, not published).</Description>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting" Version="$(AspireVersion)" />
+    <PackageReference Include="Aspire.Hosting.Nats" Version="$(AspireVersion)" />
+    <PackageReference Include="Aspire.Hosting.JavaScript" Version="$(AspireVersion)" />
+    <PackageReference Include="Aspire.Hosting.Python" Version="$(AspireVersion)" />
+    <PackageReference Include="NATS.Net" Version="$(NatsNetVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The Synadia .NET caller SDK (fork branch luisquintanilla-dotnet-sdk-core-meai), referenced from source. -->
+    <ProjectReference Include="..\..\..\..\client-sdk\dotnet\src\Synadia.AI.Agents\Synadia.AI.Agents.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Synadia.AI.Agents.Hosting.Aspire.Tests" />
+  </ItemGroup>
+
+</Project>
