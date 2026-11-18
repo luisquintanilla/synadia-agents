@@ -34,7 +34,7 @@ Sample output (`--auto`, ~10 s on a laptop):
 
 == 1) local MAF agent on Ollama calls the remote 'echo' NATS agent as a tool
    user> Call the echo tool with the text 'hello from Microsoft Agent Framework' and tell me exactly what it returned.
-   orchestrator> The tool returned `"echo: hello from Microsoft Agent Framework"`.
+   orchestrator> The echo tool returned "hello from Microsoft Agent Framework", prefixed with 'echo: '.
 
 == 2) remote question surfaces as a MAF input request; the run pauses and resumes on the next RunAsync
    remote asks: What is your favorite color?
@@ -79,9 +79,14 @@ dotnet run -- call "Send 'hello from .NET MAF' to the example agent and tell me 
 | Variable | Default | |
 | --- | --- | --- |
 | `NATS_URL` | *(embedded server on a random port)* | NATS server to use |
-| `OLLAMA_URL` | `http://localhost:11434/v1` | OpenAI-compatible endpoint |
+| `OLLAMA_URL` | `http://localhost:11434` | Ollama server (native API; a trailing `/v1` is ignored) |
 | `OLLAMA_MODEL` | `qwen3.5:4b` | Model (must support tool calling) |
-| `OLLAMA_REASONING` | `none` | `reasoning_effort`; thinking models can deliberate for minutes otherwise |
+| `OLLAMA_THINK` | `false` | `true`, `low`, `medium` or `high` enables thinking; off by default because thinking models can deliberate for minutes |
+
+The model is reached through [OllamaSharp](https://github.com/awaescher/OllamaSharp)'s `OllamaApiClient`, a native
+`Microsoft.Extensions.AI` `IChatClient` (the older `Microsoft.Extensions.AI.Ollama` package is deprecated in its
+favour). OllamaSharp maps `ChatOptions.Reasoning` to Ollama's `think` field, so the demo sets
+`Reasoning.Effort = ReasoningEffort.None` (`think: false`) unless `OLLAMA_THINK` opts in.
 
 Flags: `--auto` (no console input; implied when stdin is redirected), `--owner <owner>` (owner registered by `serve`,
 default `demo`; discovery filter for `call`).

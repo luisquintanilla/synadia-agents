@@ -6,14 +6,14 @@
 //
 // Options: --auto answers remote questions automatically (no console input); --owner <o> filters discovery.
 // Environment: NATS_URL (default: start an embedded nats-server on a random port), OLLAMA_URL
-// (default http://localhost:11434/v1), OLLAMA_MODEL (default qwen3.5:4b).
+// (default http://localhost:11434), OLLAMA_MODEL (default qwen3.5:4b), OLLAMA_THINK (default off;
+// true | low | medium | high enables thinking).
 
-using System.ClientModel;
 using System.ComponentModel;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using NATS.Client.Core;
-using OpenAI;
+using OllamaSharp;
 using Synadia.AI.Agents;
 using Synadia.AI.Agents.AgentFramework;
 using Synadia.AI.Agents.Service;
@@ -24,18 +24,17 @@ var auto = argList.Remove("--auto") || Console.IsInputRedirected;
 var ownerFilter = TakeOption(argList, "--owner");
 var command = argList.Count > 0 ? argList[0] : "demo";
 
-var ollamaUrl = Environment.GetEnvironmentVariable("OLLAMA_URL") ?? "http://localhost:11434/v1";
+// Native Ollama API (OllamaSharp's OllamaApiClient is an IChatClient). A trailing /v1 from the
+// OpenAI-compatible endpoint is tolerated for backward compatibility.
+var ollamaUrl = (Environment.GetEnvironmentVariable("OLLAMA_URL") is { Length: > 0 } u ? u : "http://localhost:11434").TrimEnd('/');
+if (ollamaUrl.EndsWith("/v1", StringComparison.OrdinalIgnoreCase)) ollamaUrl = ollamaUrl[..^3];
 var model = Environment.GetEnvironmentVariable("OLLAMA_MODEL") ?? "qwen3.5:4b";
-var reasoning = Environment.GetEnvironmentVariable("OLLAMA_REASONING") ?? "none";
-// Thinking models (qwen3.5) can deliberate for minutes on a laptop; reasoning_effort=none keeps the demo snappy.
-IChatClient ollama = new OpenAIClient(new ApiKeyCredential("ollama"),
-        new OpenAIClientOptions { Endpoint = new Uri(ollamaUrl), NetworkTimeout = TimeSpan.FromMinutes(5) })
-    .GetChatClient(model).AsIChatClient()
+// Thinking models (qwen3.5) can deliberate for minutes on a laptop, so thinking is off unless OLLAMA_THINK opts in.
+// OllamaSharp maps ChatOptions.Reasoning to Ollama's `think`: Effort None -> false, Low/Medium/High -> level.
+var reasoningOptions = ParseThink(Environment.GetEnvironmentVariable("OLLAMA_THINK"));
+IChatClient ollama = ((IChatClient)new OllamaApiClient(new HttpClient { BaseAddress = new Uri(ollamaUrl), Timeout = TimeSpan.FromMinutes(5) }, model))
     .AsBuilder()
-    .ConfigureOptions(o => o.RawRepresentationFactory ??= _ => new OpenAI.Chat.ChatCompletionOptions
-    {
-        ReasoningEffortLevel = new OpenAI.Chat.ChatReasoningEffortLevel(reasoning),
-    })
+    .ConfigureOptions(o => o.Reasoning ??= reasoningOptions)
     .Build();
 
 await using var embedded = Environment.GetEnvironmentVariable("NATS_URL") is { Length: > 0 } ? null : await NatsServerProcess.StartAsync();
@@ -201,6 +200,17 @@ static string? TakeOption(List<string> list, string name)
     list.RemoveRange(i, 2);
     return value;
 }
+
+// OLLAMA_THINK: unset/false/none -> think=false; true -> model default; low|medium|high -> that level.
+static ReasoningOptions? ParseThink(string? value) => value?.Trim().ToLowerInvariant() switch
+{
+    null or "" or "false" or "0" or "off" or "none" => new ReasoningOptions { Effort = ReasoningEffort.None },
+    "true" or "1" or "on" => null,
+    "low" => new ReasoningOptions { Effort = ReasoningEffort.Low },
+    "medium" => new ReasoningOptions { Effort = ReasoningEffort.Medium },
+    "high" => new ReasoningOptions { Effort = ReasoningEffort.High },
+    _ => throw new ArgumentException($"OLLAMA_THINK must be false, true, low, medium or high (got '{value}')."),
+};
 
 /// <summary>Prints warnings and errors from the hosted agent service.</summary>
 sealed class StderrLogger : Microsoft.Extensions.Logging.ILogger

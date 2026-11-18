@@ -111,8 +111,8 @@ builder.Services.AddNatsAgentServer("concierge", sp => new AgentServiceOptions {
 
 ## Demo
 
-[`samples/MafNatsDemo`](../../samples/MafNatsDemo) composes a local MAF agent on Ollama (`qwen3.5:4b`) with remote
-NATS agents. See its README for the commands.
+[`samples/MafNatsDemo`](../../samples/MafNatsDemo) composes a local MAF agent on Ollama (`qwen3.5:4b`, via OllamaSharp's
+native `IChatClient`) with remote NATS agents. See its README for the commands.
 
 [`samples/CopilotNatsAgent`](../../samples/CopilotNatsAgent) serves GitHub Copilot (`Microsoft.Agents.AI.GitHub.Copilot`)
 as agent type `copilot`, with Copilot's permission requests asked of the NATS caller. The TypeScript counterpart is
