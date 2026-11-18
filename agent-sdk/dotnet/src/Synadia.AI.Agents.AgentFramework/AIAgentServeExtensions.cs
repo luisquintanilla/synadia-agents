@@ -33,6 +33,54 @@ public sealed class AIAgentServeOptions
 
     /// <summary>Maximum input-request round trips within one prompt (default 8).</summary>
     public int MaxInputRounds { get; init; } = 8;
+
+    /// <summary>
+    /// Called when a prompt starts running on its conversation's <see cref="AgentSession"/>; the returned value (if any) is
+    /// disposed when the prompt ends. Lets out-of-band callbacks that the agent does not surface as MAF content (for example
+    /// a provider's own permission handler) find the active run and ask the caller via <see cref="ServedRun.AskAsync"/>.
+    /// </summary>
+    public Func<ServedRun, IDisposable?>? OnRun { get; init; }
+}
+
+/// <summary>A prompt being served by <see cref="AIAgentServeExtensions.ServeAIAgent"/>.</summary>
+public sealed class ServedRun
+{
+    private readonly TimeSpan? _queryTimeout;
+
+    internal ServedRun(PromptContext context, PromptStream stream, AgentSession session, TimeSpan? queryTimeout, CancellationToken cancellationToken)
+    {
+        Context = context;
+        Stream = stream;
+        Session = session;
+        CancellationToken = cancellationToken;
+        _queryTimeout = queryTimeout;
+    }
+
+    /// <summary>The prompt's envelope context.</summary>
+    public PromptContext Context { get; }
+
+    /// <summary>The prompt's response stream.</summary>
+    public PromptStream Stream { get; }
+
+    /// <summary>The MAF session the prompt runs on.</summary>
+    public AgentSession Session { get; }
+
+    /// <summary>Cancelled when the prompt is cancelled.</summary>
+    public CancellationToken CancellationToken { get; }
+
+    /// <summary>Ask the caller a query (§7); returns <c>null</c> on timeout.</summary>
+    public async Task<PromptEnvelope?> AskAsync(string prompt, CancellationToken cancellationToken = default)
+    {
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken, cancellationToken);
+        try
+        {
+            return await Stream.AskAsync(prompt, null, _queryTimeout, linked.Token).ConfigureAwait(false);
+        }
+        catch (AgentQueryTimeoutException)
+        {
+            return null;
+        }
+    }
 }
 
 /// <summary>Host any Microsoft Agent Framework <see cref="AIAgent"/> as a Synadia protocol agent.</summary>
@@ -88,6 +136,7 @@ public static class AIAgentServeExtensions
             try
             {
                 conversation.Session ??= await agent.CreateSessionAsync(cancellationToken).ConfigureAwait(false);
+                using var run = options.OnRun?.Invoke(new ServedRun(context, stream, conversation.Session, options.QueryTimeout, cancellationToken));
                 IEnumerable<ChatMessage> input = [context.ToChatMessage()];
                 for (var round = 0; ; round++)
                 {

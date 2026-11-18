@@ -74,6 +74,7 @@ compatibility between the two SDKs.
 | `examples/dspy/` | `@synadia-ai/nats-dspy-agent` | private | uses `file:` link to local SDK |
 | `agent-sdk/dotnet/src/Synadia.AI.Agents.AgentFramework/` | `Synadia.AI.Agents.AgentFramework` | NuGet (unpublished) | Microsoft Agent Framework 1.28.0 adapter (`NatsAIAgent`, `ServeAIAgent`); thin over the .NET SDK |
 | `agent-sdk/dotnet/samples/MafNatsDemo/` | — | not packable | MAF on Ollama ⇄ NATS agents demo; project-references the adapter |
+| `agent-sdk/dotnet/samples/CopilotNatsAgent/` | — | not packable | GitHub Copilot served as agent `copilot` via MAF (`Microsoft.Agents.AI.GitHub.Copilot` 1.28.0); permissions become caller queries. TS counterpart: `agents/copilot` |
 
 **No root `package.json`, no workspace manager.** Each subtree manages
 its own deps and tooling. Examples that ship to npm pin the SDK by

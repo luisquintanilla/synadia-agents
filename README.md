@@ -69,6 +69,7 @@ End-to-end apps built on the SDKs — browser clients, controllers that spawn ep
 | [`dspy-research-agent/`](examples/dspy-research-agent/) | agent | From-scratch DSPy-style **deep-research** agent on ax-llm's RLM — a sandboxed JS REPL with recursive `llmQuery()` sub-calls and pluggable web search (Tavily/Exa + neural `findSimilar`). Registers as token `research`. |
 | [`open-agent-vercel/`](examples/open-agent-vercel/) | agent | Runs the [`agents/open-agent/`](agents/open-agent/) bridge against `@vercel/sandbox` instead of its built-in LocalSandbox — same `runBridge`, same wire behaviour, only the sandbox factory changes. |
 | [`MafNatsDemo/`](agent-sdk/dotnet/samples/MafNatsDemo/) | both | .NET **Microsoft Agent Framework** agent on Ollama (`qwen3.5:4b`) that calls NATS agents as tools, pauses and resumes on remote questions, and serves a MAF agent whose tool approvals travel over NATS as queries. |
+| [`CopilotNatsAgent/`](agent-sdk/dotnet/samples/CopilotNatsAgent/) | agent | .NET: **GitHub Copilot** served as agent token `copilot` through Microsoft Agent Framework; Copilot's shell/write/read permission requests become §7 queries to the caller (deny by default). TS counterpart: `agents/copilot`. |
 ## Wire protocol at a glance
 
 ```

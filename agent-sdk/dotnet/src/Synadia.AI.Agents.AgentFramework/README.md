@@ -106,11 +106,17 @@ builder.Services.AddNatsAgentServer("concierge", sp => new AgentServiceOptions {
   `ApprovalParser`; a timeout denies), and other input requests (including a nested `NatsAIAgent`'s
   `AgentQueryContent`, so queries relay through chains of agents) are asked verbatim.
 - Updates stream back as protocol chunks; reasoning is dropped unless `IncludeReasoning` is set.
+- Providers that ask for permission outside MAF content (for example GitHub Copilot's `OnPermissionRequest`) can
+  use `AIAgentServeOptions.OnRun` to find the active `ServedRun` and ask the caller with `ServedRun.AskAsync`.
 
 ## Demo
 
 [`samples/MafNatsDemo`](../../samples/MafNatsDemo) composes a local MAF agent on Ollama (`qwen3.5:4b`) with remote
 NATS agents. See its README for the commands.
+
+[`samples/CopilotNatsAgent`](../../samples/CopilotNatsAgent) serves GitHub Copilot (`Microsoft.Agents.AI.GitHub.Copilot`)
+as agent type `copilot`, with Copilot's permission requests asked of the NATS caller. The TypeScript counterpart is
+`agents/copilot` (being consolidated onto the Copilot SDK separately).
 
 ## Caveats
 

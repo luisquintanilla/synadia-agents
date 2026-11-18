@@ -235,6 +235,40 @@ public sealed class AgentFrameworkTests(NatsServerFixture nats)
     }
 
     [Fact]
+    public async Task OnRunLetsOutOfBandCallbacksAskTheCaller()
+    {
+        ServedRun? active = null;
+        var model = new ScriptedChatClient((_, _) =>
+        {
+            // Stands in for a provider callback (e.g. a permission handler) that runs outside MAF's content stream.
+            var reply = active!.AskAsync("Allow shell: echo hi? (yes/no)").GetAwaiter().GetResult();
+            return [new ChatResponseUpdate(ChatRole.Assistant, $"answer: {reply?.Prompt}")];
+        });
+        var ended = false;
+        await using var rig = await ServeAsync(new ChatClientAgent(model, name: "oob"), new AIAgentServeOptions
+        {
+            OnRun = run =>
+            {
+                active = run;
+                return new Callback(() => ended = true);
+            },
+        });
+        var caller = rig.Bound.AsAIAgent(new NatsAIAgentOptions
+        {
+            QueryHandler = (q, _) => ValueTask.FromResult<string?>(q.Prompt.StartsWith("Allow shell", StringComparison.Ordinal) ? "no" : "?"),
+        });
+
+        Assert.Equal("answer: no", (await caller.RunAsync("go")).Text);
+        Assert.NotNull(active!.Session);
+        Assert.True(ended);
+    }
+
+    private sealed class Callback(Action action) : IDisposable
+    {
+        public void Dispose() => action();
+    }
+
+    [Fact]
     public async Task ServedNatsAgentRelaysNestedQueriesToTheOuterCaller()
     {
         await using var reference = await ReferenceAsync();
