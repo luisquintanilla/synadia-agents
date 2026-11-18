@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NATS.Client.Core;
 using NATS.Client.Services;
+using Synadia.AI.Agents.Identity;
 
 namespace Synadia.AI.Agents.Service;
 
@@ -33,6 +34,8 @@ public sealed class AgentService : IAsyncDisposable
     private CancellationTokenSource? _cts;
     private Task? _heartbeatLoop;
     private Dictionary<string, string>? _promptMetadata;
+    private readonly SenderGate _gate;
+    private ISenderSigner? _heartbeatSigner;
 
     /// <summary>Create (not yet started) a registration.</summary>
     public AgentService(INatsConnection connection, AgentServiceOptions options)
@@ -48,7 +51,16 @@ public sealed class AgentService : IAsyncDisposable
         if (options.KeepAliveInterval is { } k && k <= TimeSpan.Zero) throw new ArgumentException("KeepAliveInterval must be positive", nameof(options));
         _logger = options.Logger ?? NullLogger.Instance;
         _time = options.TimeProvider ?? TimeProvider.System;
+        if (options.ReplayWindow <= TimeSpan.Zero) throw new ArgumentException("ReplayWindow must be positive", nameof(options));
+        _gate = new SenderGate(options.MinSenderTrust, options.ReplayWindow, options.AccountTokenPosition, options.OperatorAttested,
+            options.AcceptSender, logger: _logger, timeProvider: _time);
     }
+
+    /// <summary>The host's own identity (bound at start when <see cref="AgentServiceOptions.Identity"/> is set), else <c>null</c>.</summary>
+    public AgentId? Identity { get; private set; }
+
+    /// <summary>The inbound sender classifier (replay cache, <c>min_sender_trust</c>, accept hook).</summary>
+    public SenderGate SenderGate => _gate;
 
     /// <summary>The registration's subjects.</summary>
     public AgentSubject Subject { get; }
@@ -95,6 +107,42 @@ public sealed class AgentService : IAsyncDisposable
         metadata["protocol_version"] = ProtocolVersion.Sdk.ToString();
         if (_options.Session is not null) metadata["session"] = _options.Session;
         else metadata.Remove("session");
+
+        AgentId? identity = null;
+        _heartbeatSigner = null;
+        if (_options.Identity is { } idOptions)
+        {
+            try
+            {
+                identity = await SelfId.LookupAsync(_nc, idOptions.Signer, cancellationToken: cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (idOptions.Signer is null && ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "self-identity lookup failed; starting without identity metadata");
+            }
+        }
+        if (identity is not null)
+        {
+            metadata[AgentIdSignature.UserNkeyKey] = identity.User;
+            metadata[AgentIdSignature.AccountKey] = identity.Account;
+            if (_options.Identity?.Signer is { } signer)
+            {
+                metadata[AgentIdSignature.IdSigKey] = await AgentIdSignature.SignAsync(signer, identity, Subject.Agent, Subject.Owner,
+                    Subject.Prompt, cancellationToken).ConfigureAwait(false);
+                _heartbeatSigner = signer;
+            }
+            else
+            {
+                metadata.Remove(AgentIdSignature.IdSigKey);
+            }
+        }
+        else
+        {
+            metadata.Remove(AgentIdSignature.UserNkeyKey);
+            metadata.Remove(AgentIdSignature.AccountKey);
+            metadata.Remove(AgentIdSignature.IdSigKey);
+        }
+        Identity = identity;
 
         var svcContext = new NatsSvcContext(_nc);
         var config = new NatsSvcConfig(AgentProtocol.ServiceName, _options.Version)
@@ -258,12 +306,39 @@ public sealed class AgentService : IAsyncDisposable
         }
     }
 
-    private ValueTask PublishHeartbeatAsync(CancellationToken cancellationToken)
-        => _nc.PublishAsync(Subject.Heartbeat, BuildHeartbeat().Encode(), cancellationToken: cancellationToken);
+    private async ValueTask PublishHeartbeatAsync(CancellationToken cancellationToken)
+    {
+        var payload = BuildHeartbeat();
+        var data = payload.Encode();
+        NatsHeaders? headers = null;
+        if (_heartbeatSigner is { } signer && Identity is { } id)
+        {
+            try
+            {
+                var header = await SenderHeader.SignAsync(signer, id, Subject.Heartbeat, data, ts: payload.Timestamp,
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+                headers = new NatsHeaders { [SenderHeader.HeaderName] = SenderHeader.Serialize(header) };
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "heartbeat signing failed; publishing unsigned on {Subject}", Subject.Heartbeat);
+            }
+        }
+        await _nc.PublishAsync(Subject.Heartbeat, data, headers, cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
 
     private async Task DispatchStatusAsync(NatsSvcMsg<byte[]> msg)
     {
         await Task.Yield();
+        try
+        {
+            var sender = _gate.ClassifyStatus(msg.Subject, msg.Data ?? [], msg.Headers);
+            _logger.LogDebug("status request on {Subject} from {Sender}", msg.Subject, SenderHeader.Format(sender));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "status sender classification failed");
+        }
         try
         {
             await msg.ReplyAsync(BuildHeartbeat().Encode()).ConfigureAwait(false);
@@ -296,7 +371,28 @@ public sealed class AgentService : IAsyncDisposable
             return;
         }
 
-        var context = new PromptContext(envelope, msg.Subject, msg.Headers, Subject);
+        SenderInfo? sender;
+        try
+        {
+            var admission = await _gate.AdmitPromptAsync(msg.Subject, msg.Data ?? [], msg.Headers, stopping).ConfigureAwait(false);
+            if (!admission.Admitted)
+            {
+                await SendErrorAsync(stream, admission.Code, admission.Description ?? "sender rejected").ConfigureAwait(false);
+                await SendTerminatorAsync(stream).ConfigureAwait(false);
+                return;
+            }
+            sender = admission.Sender;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "sender classification failed on {Subject}", msg.Subject);
+            await SendErrorAsync(stream, 500, "sender classification error").ConfigureAwait(false);
+            await SendTerminatorAsync(stream).ConfigureAwait(false);
+            return;
+        }
+        _logger.LogDebug("prompt request on {Subject} from {Sender}", msg.Subject, SenderHeader.Format(sender));
+
+        var context = new PromptContext(envelope, msg.Subject, msg.Headers, Subject, sender);
         using var keepAliveCts = CancellationTokenSource.CreateLinkedTokenSource(stopping);
         Task? keepAlive = null;
         try

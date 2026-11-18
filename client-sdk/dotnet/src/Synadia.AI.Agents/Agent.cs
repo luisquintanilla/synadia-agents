@@ -3,6 +3,7 @@ using System.Text;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
+using Synadia.AI.Agents.Identity;
 
 namespace Synadia.AI.Agents;
 
@@ -63,11 +64,18 @@ public sealed class Agent
     /// <exception cref="StreamStalledException">No chunk within the inactivity timeout.</exception>
     /// <exception cref="StreamMaxWaitExceededException">The overall deadline elapsed.</exception>
     /// <exception cref="NoRespondersException">Nobody is listening on the prompt subject.</exception>
+    /// <exception cref="SenderSignatureRequiredException">The agent requires signed senders and no signer is configured.</exception>
+    /// <exception cref="IdentityException">Identity is configured with a signer and the connection's identity cannot be bound to it.</exception>
     public IAsyncEnumerable<AgentChunk> PromptAsync(PromptEnvelope envelope, PromptOptions? options = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(envelope);
-        var payload = Validate(envelope, options);
-        return StreamAsync(payload, options, cancellationToken);
+        var sub = options?.Sub ?? PromptSubject;
+        var requireSigned = Info.PromptEndpoint.MinSenderTrust == "signed";
+        var identity = Client.Identity;
+        if (requireSigned && identity?.Signer is null) throw new SenderSignatureRequiredException(PromptSubject);
+        var headerBound = identity?.MayAttachHeader() == true ? SenderHeader.MaxHeaderBytes(sub, identity.Name) : 0;
+        var payload = Validate(envelope, options, headerBound);
+        return StreamAsync(payload, options, sub, requireSigned, cancellationToken);
     }
 
     /// <summary>Prompt and collect the whole response. Queries are answered by <paramref name="onQuery"/> or fail the call.</summary>
@@ -106,10 +114,20 @@ public sealed class Agent
     public async Task<HeartbeatPayload> GetStatusAsync(TimeSpan? timeout = null, CancellationToken cancellationToken = default)
     {
         NatsMsg<ReadOnlyMemory<byte>> reply;
+        NatsHeaders? headers = null;
+        if (Client.Identity is { } identity)
+        {
+            var plan = await identity.PlanAsync(StatusSubject, false, cancellationToken).ConfigureAwait(false);
+            if (plan is not null)
+            {
+                var header = await plan.BuildAsync(ReadOnlyMemory<byte>.Empty, null, cancellationToken).ConfigureAwait(false);
+                headers = new NatsHeaders { [SenderHeader.HeaderName] = SenderHeader.Serialize(header) };
+            }
+        }
         try
         {
             reply = await Client.Connection.RequestAsync<byte[], ReadOnlyMemory<byte>>(
-                StatusSubject, [], replyOpts: new NatsSubOpts { Timeout = timeout ?? Client.Options.StatusTimeout },
+                StatusSubject, [], headers, replyOpts: new NatsSubOpts { Timeout = timeout ?? Client.Options.StatusTimeout },
                 cancellationToken: cancellationToken).ConfigureAwait(false);
         }
         catch (NatsNoRespondersException ex)
@@ -129,29 +147,38 @@ public sealed class Agent
     public Task<TimeSpan?> PingAsync(TimeSpan? timeout = null, CancellationToken cancellationToken = default)
         => Client.PingAsync(Info.InstanceId, timeout, cancellationToken);
 
-    private byte[] Validate(PromptEnvelope envelope, PromptOptions? options)
+    private byte[] Validate(PromptEnvelope envelope, PromptOptions? options, int senderHeaderBytes)
     {
         if (envelope.Prompt.Length == 0) throw new PromptEmptyException();
         if (envelope.Attachments.Count > 0 && Info.PromptEndpoint.AttachmentsOk == false) throw new AttachmentsNotSupportedException();
         var payload = envelope.Encode();
-        long headerBytes = 0;
+        CheckSize(payload.Length, options, senderHeaderBytes);
+        return payload;
+    }
+
+    private void CheckSize(int payloadBytes, PromptOptions? options, int senderHeaderBytes)
+    {
+        const int framing = 12; // "NATS/1.0\r\n\r\n"
+        long headerBytes = senderHeaderBytes;
         if (options?.Headers is { Count: > 0 } h)
         {
-            headerBytes = "NATS/1.0\r\n\r\n".Length + h.Sum(kv => Encoding.UTF8.GetByteCount(kv.Key) + Encoding.UTF8.GetByteCount(kv.Value) + 4);
+            var extra = h.Where(kv => kv.Key != SenderHeader.HeaderName || senderHeaderBytes == 0)
+                .Sum(kv => Encoding.UTF8.GetByteCount(kv.Key) + Encoding.UTF8.GetByteCount(kv.Value) + 4);
+            // The sender-header size already includes the framing.
+            if (extra > 0) headerBytes += extra + (senderHeaderBytes > 0 ? 0 : framing);
         }
         long? endpointLimit = Info.PromptEndpoint.MaxPayloadBytes;
         long? connLimit = Client.Connection.ServerInfo?.MaxPayload is > 0 and var mp ? mp : null;
         long? effective = endpointLimit is not null && connLimit is not null
             ? Math.Min(endpointLimit.Value, connLimit.Value)
             : endpointLimit ?? connLimit;
-        if (effective is not null && payload.Length + headerBytes > effective)
+        if (effective is not null && payloadBytes + headerBytes > effective)
         {
-            throw new PayloadTooLargeException(effective.Value, payload.Length, headerBytes);
+            throw new PayloadTooLargeException(effective.Value, payloadBytes, headerBytes);
         }
-        return payload;
     }
 
-    private async IAsyncEnumerable<AgentChunk> StreamAsync(byte[] payload, PromptOptions? options,
+    private async IAsyncEnumerable<AgentChunk> StreamAsync(byte[] payload, PromptOptions? options, string signedSub, bool requireSigned,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var nc = Client.Connection;
@@ -159,6 +186,18 @@ public sealed class Agent
         var maxWait = options?.MaxWait ?? Client.Options.PromptMaxWait;
         var includeAcks = options?.IncludeAcks ?? false;
         var subject = PromptSubject;
+
+        string? senderHeader = null;
+        if (Client.Identity is { } identity)
+        {
+            var plan = await identity.PlanAsync(signedSub, requireSigned, cancellationToken).ConfigureAwait(false);
+            if (plan is not null)
+            {
+                CheckSize(payload.Length, options, plan.WireBytes); // exact re-check with the real header size
+                senderHeader = SenderHeader.Serialize(await plan.BuildAsync(payload, null, cancellationToken).ConfigureAwait(false));
+            }
+        }
+
         var inbox = nc.NewInbox();
 
         // NATS.Net v3 defaults subscription channels to DropNewest; a prompt stream must never lose chunks.
@@ -174,6 +213,11 @@ public sealed class Agent
         {
             headers = new NatsHeaders();
             foreach (var (k, v) in extra) headers[k] = v;
+        }
+        if (senderHeader is not null)
+        {
+            headers ??= new NatsHeaders();
+            headers[SenderHeader.HeaderName] = senderHeader;
         }
         await nc.PublishAsync(subject, payload, headers, replyTo: inbox, cancellationToken: cancellationToken).ConfigureAwait(false);
 

@@ -20,6 +20,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Copies of test-fixtures/agent-tools/*.json; a test checks they equal the fixtures. -->
+    <EmbeddedResource Include="Tools\Definitions\*.json" LogicalName="Synadia.AI.Agents.Tools.%(Filename).json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Synadia.AI.Agents.Tests" />
     <InternalsVisibleTo Include="Synadia.AI.Agents.Service.Tests" />
   </ItemGroup>
