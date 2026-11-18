@@ -154,6 +154,30 @@ The end-to-end tests start `nats-server` from `PATH` on a random free port.
 The TS interop tests need `bun`, plus the TS SDKs installed and built: run `bun install && bun run build` in
 `client-sdk/typescript` and in `agent-sdk/typescript`. Without them, the tests print a `SKIPPED:` note and pass.
 
+### Python interop (manual check)
+
+Python ↔ .NET is not in the automated suite. It was checked by hand against the local editable installs:
+
+```sh
+python -m venv .venv && .venv/Scripts/python -m pip install -e client-sdk/python -e agent-sdk/python
+```
+
+Both directions passed on one `nats-server`:
+
+- **.NET caller → Python agent** (`agent-sdk/python/examples/_reference_agent.py`). These all worked:
+  - `01-discover.cs`: protocol v0.3, `Compatible`.
+  - `06-chat.cs`, which uses `AsChatClient`: a two-turn chat, with history kept on the agent side.
+  - `03-prompt-attachment.cs`: the agent echoed the attachment's filename.
+- **Python caller → .NET agent** (`run-reference-agent.cs`). These all worked:
+  - `01-discover.py`.
+  - `02-prompt-text.py`.
+  - `03-prompt-attachment.py`: an attachment round trip.
+  - `04-query-reply.py`: a mid-stream query and reply, with the prompt `ask …`.
+- **Python caller → .NET Ollama agent** (`ollama-agent.cs`). `02-prompt-text.py` streamed the model's answer.
+
+On Windows, the Python reference agent stops at startup: `loop.add_signal_handler` raises `NotImplementedError`. Run it on
+Linux or macOS, or through a wrapper that replaces `asyncio.BaseEventLoop.add_signal_handler` with a no-op.
+
 ## Documentation
 
 - [`docs/protocol-mapping.md`](docs/protocol-mapping.md) maps spec sections to .NET types. It also covers the MEAI
