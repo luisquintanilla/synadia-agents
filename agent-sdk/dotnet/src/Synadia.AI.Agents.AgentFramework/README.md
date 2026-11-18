@@ -46,6 +46,11 @@ Console.WriteLine(await agent.RunAsync("and again", session));   // same protoco
 - **As a tool.** `agent.AsAIFunction()` turns the remote agent into a function tool (single `query` argument) for
   any `ChatClientAgent`. Without an explicit session each tool call uses a fresh session.
 
+- **Fixed agent vs. dynamic discovery.** `AsAIAgent()` binds one known agent. To let a model discover and prompt
+  agents itself, give a `ChatClientAgent` the SDK's agent tools instead:
+  `new AgentTools(client).AsAITools()` (`discover_agents`, `prompt_agent`, `answer_agent`, …; `Synadia.AI.Agents.Tools`).
+  Both rely on the `AgentsClient`, so its options (e.g. sender identity) apply to both.
+
 ### Remote questions (protocol §7 queries)
 
 When the remote agent asks the caller something mid-stream, the run **pauses**: the stream is held open, the

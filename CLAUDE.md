@@ -72,6 +72,8 @@ compatibility between the two SDKs.
 | `examples/pi-headless/` | `@synadia-ai/nats-pi-headless` | npm (public) | depends on `@synadia-ai/agents@^0.5.x` |
 | `examples/agent-web-ui/` | `@synadia-ai/nats-ai-testui` | github only | local-clone test client; `private: true` so it never publishes |
 | `examples/dspy/` | `@synadia-ai/nats-dspy-agent` | private | uses `file:` link to local SDK |
+| `agent-sdk/dotnet/src/Synadia.AI.Agents.AgentFramework/` | `Synadia.AI.Agents.AgentFramework` | NuGet (unpublished) | Microsoft Agent Framework 1.28.0 adapter (`NatsAIAgent`, `ServeAIAgent`); thin over the .NET SDK |
+| `agent-sdk/dotnet/samples/MafNatsDemo/` | — | not packable | MAF on Ollama ⇄ NATS agents demo; project-references the adapter |
 
 **No root `package.json`, no workspace manager.** Each subtree manages
 its own deps and tooling. Examples that ship to npm pin the SDK by

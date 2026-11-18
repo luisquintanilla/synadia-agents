@@ -54,6 +54,8 @@ promotion. Tracing is not part of this release: the SDKs carry generic extension
 request interceptors, extra envelope fields, heartbeat extras), and extensions such as tracing build
 on them in separate packages.
 
+**Microsoft Agent Framework (.NET):** [`Synadia.AI.Agents.AgentFramework`](agent-sdk/dotnet/src/Synadia.AI.Agents.AgentFramework/) (unpublished) wraps any NATS agent as a MAF `AIAgent` (`agent.AsAIAgent()`) and serves any MAF `AIAgent` on NATS (`agentService.ServeAIAgent(aiAgent)`).
+
 ## Examples
 
 End-to-end apps built on the SDKs — browser clients, controllers that spawn ephemeral agents, and agents built from scratch. Full write-ups in [`examples/README.md`](examples/README.md).
@@ -66,7 +68,7 @@ End-to-end apps built on the SDKs — browser clients, controllers that spawn ep
 | [`dspy/`](examples/dspy/) | agent | From-scratch DSPy-style **ReAct** agent on `AgentService` with four sandboxed filesystem tools. Registers as token `dspy`. |
 | [`dspy-research-agent/`](examples/dspy-research-agent/) | agent | From-scratch DSPy-style **deep-research** agent on ax-llm's RLM — a sandboxed JS REPL with recursive `llmQuery()` sub-calls and pluggable web search (Tavily/Exa + neural `findSimilar`). Registers as token `research`. |
 | [`open-agent-vercel/`](examples/open-agent-vercel/) | agent | Runs the [`agents/open-agent/`](agents/open-agent/) bridge against `@vercel/sandbox` instead of its built-in LocalSandbox — same `runBridge`, same wire behaviour, only the sandbox factory changes. |
-
+| [`MafNatsDemo/`](agent-sdk/dotnet/samples/MafNatsDemo/) | both | .NET **Microsoft Agent Framework** agent on Ollama (`qwen3.5:4b`) that calls NATS agents as tools, pauses and resumes on remote questions, and serves a MAF agent whose tool approvals travel over NATS as queries. |
 ## Wire protocol at a glance
 
 ```

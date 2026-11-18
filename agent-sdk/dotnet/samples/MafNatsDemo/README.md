@@ -83,4 +83,5 @@ dotnet run -- call "Send 'hello from .NET MAF' to the example agent and tell me 
 | `OLLAMA_MODEL` | `qwen3.5:4b` | Model (must support tool calling) |
 | `OLLAMA_REASONING` | `none` | `reasoning_effort`; thinking models can deliberate for minutes otherwise |
 
-Flags: `--auto` (no console input), `--owner <owner>` (discovery filter for `call`; the owner registered by `serve`).
+Flags: `--auto` (no console input; implied when stdin is redirected), `--owner <owner>` (owner registered by `serve`,
+default `demo`; discovery filter for `call`).
