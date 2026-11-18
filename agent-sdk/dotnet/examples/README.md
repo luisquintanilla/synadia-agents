@@ -177,19 +177,25 @@ Registers as `llm` and prints the chain on startup, e.g. `backend: openrouter/op
 Failover uses MEAI's routing clients (`Microsoft.Extensions.AI` 11, `[Experimental]` under `MEAI001`, suppressed
 around the one constructor call). If OpenRouter fails **before any output streams** (bad key, 429, outage), the same
 prompt goes to Ollama. The OpenAI client's own retries are off, so the chain fails over at once. A failure **after**
-output has started is terminal, and the caller gets an error chunk: MEAI never retracts a partial answer. Each failure
-and failover is logged to stderr:
+output has started is terminal, and the caller gets an error chunk: MEAI never retracts a partial answer.
+
+Each route's builder chain ends with MEAI's stock `LoggingChatClient`, under a per-route category (`route.openrouter`,
+`route.ollama`). `UseLogging()` would log both routes under the same `LoggingChatClient` category, so a tiny
+`UseRouteLogging(loggerFactory, route)` extension creates a named logger instead. Logs go to stderr, one line each, at
+`Debug` for the `route.*` categories. `Trace` stays off because `LoggingChatClient` logs full messages at `Trace`.
+There's no separate "failover" line: a `route.ollama` "invoked" right after a `route.openrouter` "failed" is the
+failover. With a dead primary (exception and stack trace trimmed):
 
 ```
-route openrouter/openai/gpt-4o-mini failed: ClientResultException: HTTP 401 (: )
-Missing Authentication header
-failover: answering with ollama/qwen3.5:4b
+dbug: route.openrouter[1723383095] GetStreamingResponseAsync invoked.
+fail: route.openrouter[1784604714] GetStreamingResponseAsync failed. System.ClientModel.ClientResultException: No connection could be made because the target machine actively refused it. (127.0.0.1:60201) …
+dbug: route.ollama[1723383095] GetStreamingResponseAsync invoked.
+dbug: route.ollama[1553703230] GetStreamingResponseAsync completed.
 ```
 
-(`OrderedFailoverChatClient` is sealed, so the log comes from a small `ChatClientBuilder.Use` middleware on each route.
-To subclass, derive from `FailoverChatClient` and override `OnRoutingUpdateAsync`.) Each route keeps its own tuning
-on its own client: Ollama's `think: false` is a `ConfigureOptions` on the Ollama route only, so it never reaches the
-OpenRouter request.
+(`OrderedFailoverChatClient` is sealed. For a single "failed over" event with timings, derive from `FailoverChatClient`
+and override `OnRoutingUpdateAsync`.) Each route keeps its own tuning on its own client: Ollama's `think: false` is a
+`ConfigureOptions` on the Ollama route only, so it never reaches the OpenRouter request.
 
 Try the failover without a key:
 

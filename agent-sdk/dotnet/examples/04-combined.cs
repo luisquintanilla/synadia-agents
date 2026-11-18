@@ -19,6 +19,7 @@
 // Identity/connection flags as in 01-echo (this example registers agent="llm"). Run with -h for every flag.
 #:package Microsoft.Extensions.AI@11.0.0
 #:package Microsoft.Extensions.AI.OpenAI@11.0.0
+#:package Microsoft.Extensions.Logging.Console@11.0.0
 #:package OllamaSharp@5.5.2
 #:project _shared/ExampleHost.csproj
 #:property PublishAot=false
@@ -26,12 +27,21 @@
 using System.ClientModel;
 using System.ClientModel.Primitives;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
 using OllamaSharp;
 using OpenAI;
 using Synadia.AI.Agents.Examples;
 using Synadia.AI.Agents.Service;
 
-var (llm, label) = CreateChatClient();
+// Route logs go to stderr, one line each. Debug shows each route's invoked/completed/failed lines; Trace would also log
+// full messages, so it stays off.
+using var loggerFactory = LoggerFactory.Create(b => b
+    .AddSimpleConsole(o => o.SingleLine = true)
+    .AddConsole(o => o.LogToStandardErrorThreshold = LogLevel.Trace)
+    .SetMinimumLevel(LogLevel.Warning)
+    .AddFilter("route", LogLevel.Debug));
+
+var (llm, label) = CreateChatClient(loggerFactory);
 using var _ = llm;
 var description = $"LLM agent — answers prompts via {label}";
 
@@ -48,24 +58,20 @@ Console.WriteLine("press Ctrl+C to stop");
 await ExampleHost.WaitForShutdownAsync();
 
 // The whole "llm" layer: Ollama alone, or OpenRouter → Ollama when an OpenRouter key is configured.
-static (IChatClient Client, string Label) CreateChatClient()
+static (IChatClient Client, string Label) CreateChatClient(ILoggerFactory loggerFactory)
 {
-    var (ollama, ollamaName) = CreateOllama();
+    var (ollama, ollamaName) = CreateOllama(loggerFactory);
     if (Environment.GetEnvironmentVariable("OPENROUTER_API_KEY") is not { Length: > 0 } apiKey)
         return (ollama, ollamaName);
 
-    var (openRouter, openRouterName) = CreateOpenRouter(apiKey);
+    var (openRouter, openRouterName) = CreateOpenRouter(apiKey, loggerFactory);
 #pragma warning disable MEAI001 // Routing/failover clients are [Experimental] in Microsoft.Extensions.AI 11.
-    var chain = new OrderedFailoverChatClient(
-    [
-        Observe(openRouter, openRouterName, isFallback: false),
-        Observe(ollama, ollamaName, isFallback: true),
-    ]);
+    var chain = new OrderedFailoverChatClient([openRouter, ollama]);
 #pragma warning restore MEAI001
     return (chain, $"{openRouterName} → {ollamaName} (failover)");
 }
 
-static (IChatClient, string) CreateOpenRouter(string apiKey)
+static (IChatClient, string) CreateOpenRouter(string apiKey, ILoggerFactory loggerFactory)
 {
     var model = Environment.GetEnvironmentVariable("OPENROUTER_MODEL") ?? "openai/gpt-4o-mini";
     var baseUrl = Environment.GetEnvironmentVariable("OPENAI_BASE_URL") ?? "https://openrouter.ai/api/v1";
@@ -76,10 +82,10 @@ static (IChatClient, string) CreateOpenRouter(string apiKey)
         // The failover chain is the retry: hand a 429/outage to the next route instead of backing off here.
         RetryPolicy = new ClientRetryPolicy(maxRetries: 0),
     }).GetChatClient(model).AsIChatClient();
-    return (client, $"openrouter/{model}");
+    return (new ChatClientBuilder(client).UseRouteLogging(loggerFactory, "openrouter").Build(), $"openrouter/{model}");
 }
 
-static (IChatClient, string) CreateOllama()
+static (IChatClient, string) CreateOllama(ILoggerFactory loggerFactory)
 {
     var url = (Environment.GetEnvironmentVariable("OLLAMA_URL") ?? Environment.GetEnvironmentVariable("OLLAMA_ENDPOINT")
         ?? "http://localhost:11434").TrimEnd('/');
@@ -90,24 +96,17 @@ static (IChatClient, string) CreateOllama()
     // Thinking models (qwen3.5) think by default, which is slow; OllamaSharp maps ReasoningEffort.None to
     // `think: false`. ConfigureOptions sits on this route only, so it never leaks into the OpenRouter request.
     var client = new ChatClientBuilder(new OllamaApiClient(http, model))
+        .UseRouteLogging(loggerFactory, "ollama")
         .ConfigureOptions(o => o.Reasoning ??= new ReasoningOptions { Effort = ReasoningEffort.None })
         .Build();
     return (client, $"ollama/{model}");
 }
 
-// Makes failover visible on stderr: a route reports its own failure, and the fallback announces when the chain reaches
-// it (in the chain, Ollama only runs after OpenRouter failed before streaming anything).
-static IChatClient Observe(IChatClient route, string name, bool isFallback) =>
-    new ChatClientBuilder(route).Use(async (messages, options, next, cancellationToken) =>
-    {
-        if (isFallback) Console.Error.WriteLine($"failover: answering with {name}");
-        try
-        {
-            await next(messages, options, cancellationToken);
-        }
-        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
-        {
-            Console.Error.WriteLine($"route {name} failed: {ex.GetType().Name}: {ex.Message}");
-            throw;
-        }
-    }).Build();
+static class RouteLogging
+{
+    // UseLogging() logs under the fixed "LoggingChatClient" category, so the two routes would look identical; a
+    // per-route category ("route.openrouter", "route.ollama") makes the failover readable on stderr.
+    public static ChatClientBuilder UseRouteLogging(this ChatClientBuilder builder, ILoggerFactory loggerFactory,
+        string route) =>
+        builder.Use(inner => new LoggingChatClient(inner, loggerFactory.CreateLogger($"route.{route}")));
+}
