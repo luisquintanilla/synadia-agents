@@ -1,0 +1,115 @@
+# Synadia.AI.Agents.AgentFramework
+
+[Microsoft Agent Framework](https://github.com/microsoft/agent-framework) (MAF) adapter for the
+[Synadia Agent Protocol for NATS](https://github.com/synadia-ai/synadia-agent-sdk-docs). It works in both
+directions:
+
+| Direction | API | What it does |
+| --- | --- | --- |
+| **Call** a remote NATS agent from MAF | `agent.AsAIAgent()` → `NatsAIAgent : AIAgent` | Any discovered NATS agent (TS, Python, .NET, Claude Code, …) becomes a MAF `AIAgent`. Use it with `RunAsync`, sessions, `AsAIFunction()` (as a tool of another agent) and workflows. |
+| **Serve** a MAF agent on NATS | `agentService.ServeAIAgent(aiAgent)` / `services.AddNatsAgentServer(...)` | Any MAF `AIAgent` (e.g. `ChatClientAgent`) becomes a protocol-compliant NATS agent that every SDK can discover and prompt. |
+
+It is a thin layer over the MEAI-native core (`Synadia.AI.Agents` / `Synadia.AI.Agents.Service`): the wire protocol,
+streaming, status, queries, and heartbeats all live in the SDK. This package only maps MAF concepts
+(sessions, input requests, tool approvals) onto them.
+
+## Packages and versions
+
+Pinned to **MAF 1.28.0** (the stable GA line on nuget.org):
+
+- The library depends only on `Microsoft.Agents.AI.Abstractions` 1.28.0 (`AIAgent`, `AgentSession`, `AgentRunOptions`,
+  `AgentResponse[Update]`) plus `Microsoft.Extensions.Hosting.Abstractions` for the hosted service.
+- `Microsoft.Agents.AI` 1.28.0 (`ChatClientAgent`, `AsAIFunction`) and `Microsoft.Agents.AI.Workflows` 1.28.0
+  (`AgentWorkflowBuilder`, `InProcessExecution`, `RequestInfoEvent`) are only needed by consumers; the tests and the
+  sample use them.
+- `Microsoft.Agents.AI.Hosting` is **preview-only** (`1.28.0-preview.*`) and pulls in ASP.NET Core. This package does
+  not depend on it. `AddNatsAgentServer(agentName, …)` resolves a *keyed* `AIAgent`, the same registration MAF
+  Hosting's `AddAIAgent(name, …)` produces, so the two compose without a hard dependency.
+- MAF 1.28.0 targets MEAI 10.x; the SDK uses MEAI 11.0.0, which it binds to without issue.
+
+## Call a remote NATS agent from MAF
+
+```csharp
+await using var client = new AgentsClient(natsConnection);
+var remote = (await client.DiscoverAsync(new AgentFilter { Name = "example" })).Single();
+
+AIAgent agent = remote.AsAIAgent();                 // NatsAIAgent; Name/Description come from discovery
+AgentSession session = await agent.CreateSessionAsync();
+Console.WriteLine(await agent.RunAsync("hello", session));
+Console.WriteLine(await agent.RunAsync("and again", session));   // same protocol conversation
+```
+
+- **Sessions.** A `NatsAgentSession` carries a protocol `session_id` (sent as a §5.6 envelope extra) so the
+  remote agent can keep per-conversation memory. Sessions serialize with `SerializeSessionAsync` /
+  `DeserializeSessionAsync`. Other `AgentRunOptions.AdditionalProperties` are forwarded as extras too.
+- **Status** chunks arrive as `AgentStatusContent` in the response updates.
+- **As a tool.** `agent.AsAIFunction()` turns the remote agent into a function tool (single `query` argument) for
+  any `ChatClientAgent`. Without an explicit session each tool call uses a fresh session.
+
+### Remote questions (protocol §7 queries)
+
+When the remote agent asks the caller something mid-stream, the run **pauses**: the stream is held open, the
+question is surfaced, and the run returns. The *next* run on the same session answers it and continues the original
+stream. `NatsAIAgentOptions.QueryMode` controls how the question is surfaced:
+
+| `QueryMode` | Surfaced as | Answer with |
+| --- | --- | --- |
+| `InputRequest` (default) | `AgentQueryContent` (an MEAI `InputRequestContent`) | `query.CreateResponse("text")`, or just plain user text |
+| `FunctionCall` | `FunctionCallContent("nats_agent_query", { prompt })` | `FunctionResultContent(callId, "text")` — this is what MAF **workflows** raise as a `RequestInfoEvent` |
+| `ToolApproval` | `ToolApprovalRequestContent` | `approval.CreateResponse(true/false)` → sent as `yes`/`no` |
+
+```csharp
+var paused = await agent.RunAsync("ask What is your favorite color?", session);
+var query = paused.Messages.SelectMany(m => m.Contents).OfType<AgentQueryContent>().Single();
+var resumed = await agent.RunAsync(new ChatMessage(ChatRole.User, [query.CreateResponse("teal")]), session);
+```
+
+Alternatively, set `NatsAIAgentOptions.QueryHandler` to answer inline without pausing. Use a handler when the agent
+runs as a tool (`AsAIFunction`): a function call cannot pause halfway.
+
+**Workflows.** In `FunctionCall` mode, `AgentWorkflowBuilder.BuildSequential(natsAgent, …)` surfaces the remote
+question as a `RequestInfoEvent`; answer it with `run.SendResponseAsync(request.CreateResponse(new FunctionResultContent(call.CallId, "answer")))`.
+See `WorkflowSurfacesRemoteQueryAsRequestInfoInFunctionCallMode` in the tests.
+
+## Serve a MAF agent on NATS
+
+```csharp
+var concierge = new ChatClientAgent(chatClient, new ChatClientAgentOptions
+{
+    Name = "concierge",
+    ChatOptions = new() { Tools = [new ApprovalRequiredAIFunction(AIFunctionFactory.Create(BookTable))] },
+});
+
+await using var service = new AgentService(natsConnection, new AgentServiceOptions
+{
+    Agent = "maf", Owner = "demo", Name = "concierge", Description = "Books restaurant tables",
+}).ServeAIAgent(concierge);
+await service.StartAsync();
+```
+
+Or with dependency injection (registers an `IHostedService`; resolves `INatsConnection` from the container):
+
+```csharp
+builder.Services.AddKeyedSingleton<AIAgent>("concierge", (sp, _) => concierge);
+builder.Services.AddNatsAgentServer("concierge", sp => new AgentServiceOptions { Agent = "maf", Owner = "demo", Name = "concierge" });
+```
+
+- One MAF `AgentSession` is kept per caller conversation (`AIAgentServeOptions.ConversationKey`, default: the
+  envelope's `session_id` extra), so a `NatsAIAgent` caller gets multi-turn memory automatically.
+- MAF human-in-the-loop requests become protocol queries to the caller:
+  `ToolApprovalRequestContent` → `"Allow tool 'x' with arguments {…}? (yes/no)"` (customize with `ApprovalPrompt` /
+  `ApprovalParser`; a timeout denies), and other input requests (including a nested `NatsAIAgent`'s
+  `AgentQueryContent`, so queries relay through chains of agents) are asked verbatim.
+- Updates stream back as protocol chunks; reasoning is dropped unless `IncludeReasoning` is set.
+
+## Demo
+
+[`samples/MafNatsDemo`](../../samples/MafNatsDemo) composes a local MAF agent on Ollama (`qwen3.5:4b`) with remote
+NATS agents. See its README for the commands.
+
+## Caveats
+
+- A paused query lives in memory (the open stream); serializing a session while a query is pending does not
+  persist the pending query. `NatsAgentSession.CancelPendingQueryAsync()` abandons it.
+- The remote agent decides how long it waits for an answer (the .NET service default is 5 minutes).
+- Remote agents without per-session memory (e.g. the reference agents) ignore `session_id`.
