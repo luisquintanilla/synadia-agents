@@ -114,6 +114,17 @@ cd client-sdk/dotnet/examples && dotnet run 06-chat.cs
 
 The TS examples prompt the *first* discovered agent, so run only the Ollama agent (or filter) during the demo.
 
+The model client is [OllamaSharp](https://github.com/awaescher/OllamaSharp). Its `OllamaApiClient` is an `IChatClient`
+over Ollama's native `/api/chat`, and it replaces the deprecated `Microsoft.Extensions.AI.Ollama` package. The
+environment variables are:
+
+- `OLLAMA_ENDPOINT` (default `http://localhost:11434`). A trailing `/v1` is ignored, so an OpenAI-compatible URL still works.
+- `OLLAMA_MODEL` (default `qwen3.5:4b`).
+
+qwen3.5 thinks by default, which is slow. The example sets `ChatOptions.Reasoning = new() { Effort = ReasoningEffort.None }`,
+and OllamaSharp sends that to Ollama as `think: false`. Pass `--think` to keep thinking; the reasoning then reaches the
+caller as `status` chunks.
+
 ## Build and test
 
 ```sh

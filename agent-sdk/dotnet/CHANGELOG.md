@@ -31,4 +31,5 @@ All notable changes to these packages are documented here. The format follows
     - `NatsServerProcess`, a `nats-server` on a random free port.
   - **Tests.** End-to-end tests and TS interop in both directions (.NET caller ↔ TS reference agent, TS caller ↔ .NET
     reference agent, including queries and attachments).
-  - **Examples.** `run-reference-agent.cs`, and `ollama-agent.cs` (`ServeChatClient` over a local Ollama model).
+  - **Examples.** `run-reference-agent.cs`, and `ollama-agent.cs` (`ServeChatClient` over a local Ollama model through
+    OllamaSharp's `IChatClient`).

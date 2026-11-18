@@ -89,7 +89,8 @@ The caller subscribes to the reply inbox with `NatsSubChannelOpts { FullMode = W
 | Can `AIFunction` report a verbatim JSON schema? | `AIFunctionDeclaration.JsonSchema`, `Name` and `Description` are virtual. | `AgentToolFunction` returns the fixture schema verbatim (byte-equal tests). |
 | Is `FunctionInvokingChatClient` in Abstractions? | No, it is in `Microsoft.Extensions.AI`. | The core does not depend on it. `AgentToolFunction` has no tool-call id, so detached-call ids are generated. Hosts add `.UseFunctionInvocation()` themselves. |
 | `AIJsonUtilities.DefaultOptions` | Writes indented JSON. | Wire JSON uses our own source-generated contexts and `Utf8JsonWriter`, never MEAI's options. |
-| Portable reasoning control | `ChatOptions.Reasoning` / `ReasoningEffort` exist in 11.0.0. | The Ollama demo uses `ReasoningEffort.None` (qwen3.5 otherwise thinks for minutes). |
+| Portable reasoning control | `ChatOptions.Reasoning` / `ReasoningEffort` exist in 11.0.0. | The Ollama demo uses `ReasoningEffort.None` (qwen3.5 otherwise thinks for minutes). OllamaSharp 5.5.2 maps it to Ollama's native `think: false`, which was checked by capturing the `/api/chat` request body, so no provider-specific `RawRepresentationFactory` is needed. |
+| Ollama client | OllamaSharp 5.5.2 is the newest release. It is compiled against MEAI.Abstractions 10.8 and binds to 11.0.0 at runtime with no load errors. | `examples/ollama-agent.cs` uses `OllamaApiClient` as its `IChatClient` (`Microsoft.Extensions.AI.Ollama` is deprecated). |
 
 ## Sender identity (§13, additive)
 

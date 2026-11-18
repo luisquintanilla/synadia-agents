@@ -6,33 +6,37 @@
 //   dotnet run ollama-agent.cs -- --agent-tools     # also let the model discover/prompt other agents
 //   dotnet run ollama-agent.cs -- --think           # keep qwen's (slow) thinking; streamed as status chunks
 //
-// Env: NATS_URL (default nats://127.0.0.1:4222), OLLAMA_ENDPOINT (default http://localhost:11434/v1),
-//      OLLAMA_MODEL (default qwen3.5:4b).
+// Env: NATS_URL (default nats://127.0.0.1:4222), OLLAMA_ENDPOINT (default http://localhost:11434; a trailing /v1 from
+//      the OpenAI-compatible URL is stripped), OLLAMA_MODEL (default qwen3.5:4b).
 //
 // Demo tools: current_time (runs freely) and restart_service, which needs approval — the approval request travels to
 // the caller as a §7 mid-stream query ("Allow tool 'restart_service' …? (yes/no)") and the answer resumes the model.
+//
+// The model client is OllamaSharp: OllamaApiClient implements IChatClient directly against Ollama's native /api/chat
+// (it replaces the deprecated Microsoft.Extensions.AI.Ollama package). OllamaSharp 5.5.2 is compiled against MEAI 10.8
+// and runs unchanged on MEAI 11.
 #:package Microsoft.Extensions.AI@11.0.0
-#:package Microsoft.Extensions.AI.OpenAI@11.0.0
+#:package OllamaSharp@5.5.2
 #:project ../src/Synadia.AI.Agents.Service/Synadia.AI.Agents.Service.csproj
 #:property PublishAot=false
 
-using System.ClientModel;
 using System.ComponentModel;
 using Microsoft.Extensions.AI;
 using NATS.Client.Core;
-using OpenAI;
+using OllamaSharp;
 using Synadia.AI.Agents;
 using Synadia.AI.Agents.Service;
 using Synadia.AI.Agents.Tools;
 
-var endpoint = Environment.GetEnvironmentVariable("OLLAMA_ENDPOINT") ?? "http://localhost:11434/v1";
+var endpoint = (Environment.GetEnvironmentVariable("OLLAMA_ENDPOINT") ?? "http://localhost:11434").TrimEnd('/');
+if (endpoint.EndsWith("/v1", StringComparison.OrdinalIgnoreCase)) endpoint = endpoint[..^3];
 var model = Environment.GetEnvironmentVariable("OLLAMA_MODEL") ?? "qwen3.5:4b";
 var useAgentTools = args.Contains("--agent-tools");
 var think = args.Contains("--think");
 
-IChatClient ollama = new OpenAIClient(new ApiKeyCredential("ollama"), new OpenAIClientOptions { Endpoint = new Uri(endpoint) })
-    .GetChatClient(model)
-    .AsIChatClient();
+// A cold model load can take well over HttpClient's default 100 s.
+var http = new HttpClient { BaseAddress = new Uri(endpoint), Timeout = TimeSpan.FromMinutes(10) };
+IChatClient ollama = new OllamaApiClient(http, model);
 
 IChatClient chatClient = ollama.AsBuilder().UseFunctionInvocation().Build();
 
@@ -73,7 +77,8 @@ service.ServeChatClient(chatClient, new ChatClientServeOptions
     ChatOptions = new ChatOptions
     {
         Tools = tools,
-        // qwen3.5 thinks for minutes per turn by default; --think keeps it and streams the reasoning as status chunks.
+        // qwen3.5 thinks by default (slow). OllamaSharp maps Effort = None to Ollama's `think: false`; --think keeps
+        // thinking and streams the reasoning as status chunks.
         Reasoning = think ? null : new ReasoningOptions { Effort = ReasoningEffort.None },
     },
     IncludeReasoning = think,
